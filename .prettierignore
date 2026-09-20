@@ -1,0 +1,8 @@
+.next
+.next-build
+node_modules
+pnpm-lock.yaml
+storybook-static
+playwright-report
+test-results
+src/lib/api/schema.d.ts

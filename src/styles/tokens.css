@@ -1,0 +1,51 @@
+/*
+ * Eventor admin design tokens.
+ * Source: docs/dashboard-components.md §1 + Figma "Admin Dashboard v2".
+ * Defined once here; the Tailwind theme (globals.css) reads them.
+ */
+:root {
+  /* Brand & surfaces */
+  --brand: #2b075d;
+  --brand-hover: #3a0f78;
+  --brand-soft: #f3eefa;
+  --canvas: #f7f6f9;
+  --surface: #ffffff;
+  --border: #e7e5ec;
+
+  /* Text */
+  --ink: #1a1a1f;
+  --ink-2: #3f3d46;
+  --muted: #6b6b75;
+  --faint: #9a98a3;
+
+  /* Tones */
+  --green: #15803d;
+  --green-soft: #e8f5ec;
+  --amber: #b45309;
+  --amber-soft: #fdf1e4;
+  --red: #b91c1c;
+  --red-soft: #fbeaea;
+  --blue: #1d4ed8;
+  --blue-soft: #eaf0fd;
+  --gold: #9a6c1d;
+  --gold-soft: #faf2e2;
+  --gray-soft: #f0eff3;
+
+  /* Radius */
+  --radius-xs: 4px; /* checkbox */
+  --radius-sm: 6px;
+  --radius-md: 8px; /* inputs, buttons */
+  --radius-lg: 10px;
+  --radius-xl: 12px; /* cards */
+  --radius-2xl: 14px; /* dialogs */
+  --radius-pill: 999px;
+
+  /* Elevation (overlays only) */
+  --shadow-overlay: 0 12px 32px rgba(26, 13, 51, 0.18);
+
+  /* Layout */
+  --sidebar-width: 248px;
+  --topbar-height: 64px;
+  --page-padding-x: 32px;
+  --page-padding-y: 28px;
+}
