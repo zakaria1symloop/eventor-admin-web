@@ -58,6 +58,15 @@ export function buildUrl(path: string, query?: QueryParams): string {
 export type RefreshResult = "ok" | "unauthorized" | "network";
 let refreshPromise: Promise<RefreshResult> | null = null;
 
+/** Why the last refresh was refused: `replaced` when this admin signed in on another computer (AUTH_SESSION_REPLACED). */
+let signOutReason: "replaced" | null = null;
+/** Read once by the login redirect, so the login page can say why the session ended. */
+export function takeSignOutReason(): "replaced" | null {
+  const reason = signOutReason;
+  signOutReason = null;
+  return reason;
+}
+
 /**
  * POST /admin/auth/refresh (module 1): httpOnly cookie in,
  * `{ data: { accessToken, expiresIn, user } }` out. Distinguishes a rejected
@@ -79,6 +88,10 @@ export function refreshSession(): Promise<RefreshResult> {
         const res = locks ? await locks.request("eventor-admin-refresh", doFetch) : await doFetch();
         if (!res.ok) {
           tokenStore.clear();
+          if (res.status === 401) {
+            const body = (await res.json().catch(() => null)) as { code?: string } | null;
+            if (body?.code === "AUTH_SESSION_REPLACED") signOutReason = "replaced";
+          }
           // 429 (auth throttle) is transient: keep the user on the page instead of signing them out.
           return res.status >= 500 || res.status === 429 ? "network" : "unauthorized";
         }

@@ -218,7 +218,7 @@ export interface DateInputProps extends Omit<InputProps, "type" | "value" | "onC
 }
 
 export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(function DateInput(
-  { value, onValueChange, className, ...props },
+  { value, onValueChange, className, onClick, ...props },
   ref,
 ) {
   return (
@@ -228,6 +228,17 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(function D
         type="date"
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
+        // The native indicator is hidden behind our icon, so open the calendar on any click
+        // (Chrome/Edge otherwise only open it from the indicator itself). Typing still works.
+        onClick={(e) => {
+          onClick?.(e);
+          if (e.defaultPrevented || props.disabled || props.readOnly) return;
+          try {
+            e.currentTarget.showPicker?.();
+          } catch {
+            // showPicker throws outside a user gesture or in a cross-origin iframe; typing still works.
+          }
+        }}
         className={cn("pe-9 [&::-webkit-calendar-picker-indicator]:opacity-0", className)}
         {...props}
       />

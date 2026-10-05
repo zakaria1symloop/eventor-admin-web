@@ -112,6 +112,16 @@ describe("LoginForm", () => {
     expect(await screen.findByText("Email must be an email")).toBeInTheDocument();
   });
 
+  it("explains a sign-out caused by signing in on another computer (?reason=replaced)", () => {
+    renderWithProviders(<LoginForm signedInElsewhere />);
+    expect(screen.getByText(/signed in on another computer/)).toBeInTheDocument();
+  });
+
+  it("shows no such banner on a plain visit", () => {
+    renderWithProviders(<LoginForm />);
+    expect(screen.queryByText(/signed in on another computer/)).not.toBeInTheDocument();
+  });
+
   it("shows banners for blocked accounts and an unreachable API", async () => {
     const u = userEvent.setup();
     renderWithProviders(<LoginForm />);

@@ -18,17 +18,17 @@ export default async function LoginPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ next?: string; reset?: string }>;
+  searchParams: Promise<{ next?: string; reset?: string; reason?: string }>;
 }) {
   const { locale } = await params;
-  const { next, reset } = await searchParams;
+  const { next, reset, reason } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations("login");
 
   return (
     <AuthLayout>
       <AuthTitle title={t("title")} subtitle={t("subtitle")} withLanguage />
-      <LoginForm next={next} passwordChanged={reset === "1"} />
+      <LoginForm next={next} passwordChanged={reset === "1"} signedInElsewhere={reason === "replaced"} />
     </AuthLayout>
   );
 }

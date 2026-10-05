@@ -321,7 +321,9 @@
     "blocked": "This admin account is blocked. Contact another admin.",
     "forbiddenRole": "Only admin accounts can sign in here.",
     "network": "Can't reach the Eventor API. Check your connection and try again.",
-    "passwordChanged": "Password changed. Sign in with your new password."
+    "passwordChanged": "Password changed. Sign in with your new password.",
+    "signedInElsewhereTitle": "Signed out",
+    "signedInElsewhere": "You were signed out because your account signed in on another computer. Only one computer can use an admin account at a time."
   },
   "publicForm": {
     "title": "Request form",

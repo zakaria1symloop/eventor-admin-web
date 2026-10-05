@@ -27,7 +27,16 @@ type FormBanner =
   { kind: "locked" } | { kind: "blocked" | "forbidden" | "network" | "other"; message: string };
 
 /** SHL-03 sign-in form: POST /admin/auth/login. */
-export function LoginForm({ next, passwordChanged }: { next?: string; passwordChanged?: boolean }) {
+export function LoginForm({
+  next,
+  passwordChanged,
+  signedInElsewhere,
+}: {
+  next?: string;
+  passwordChanged?: boolean;
+  /** `?reason=replaced`: this admin signed in on another computer, which ended this session. */
+  signedInElsewhere?: boolean;
+}) {
   const t = useTranslations("login");
   const hydrated = useHydrated();
   const tv = useTranslations("validation");
@@ -129,6 +138,9 @@ export function LoginForm({ next, passwordChanged }: { next?: string; passwordCh
         />
       )}
       {banner && banner.kind !== "locked" && <Banner tone="red" title={banner.message} />}
+      {!banner && signedInElsewhere && (
+        <Banner tone="amber" title={t("signedInElsewhereTitle")} description={t("signedInElsewhere")} />
+      )}
 
       <Field label={t("email")} error={errors.email?.message}>
         <EmailInput autoComplete="username" placeholder="name@eventor.dz" {...form.register("email")} />

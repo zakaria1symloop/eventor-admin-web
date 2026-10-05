@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter, usePathname } from "@/i18n/navigation";
-import { refreshSession, setAuthFailureHandler } from "@/lib/api/client";
+import { refreshSession, setAuthFailureHandler, takeSignOutReason } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { tokenStore } from "@/lib/api/token";
 import { useSession } from "@/lib/auth/use-session";
@@ -25,7 +25,8 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   const toLogin = useCallback(() => {
     const qs = typeof window !== "undefined" ? window.location.search : "";
-    router.replace(`/login?next=${encodeURIComponent(`${pathname}${qs}`)}`);
+    const reason = takeSignOutReason();
+    router.replace(`/login?next=${encodeURIComponent(`${pathname}${qs}`)}${reason ? `&reason=${reason}` : ""}`);
   }, [router, pathname]);
 
   useEffect(() => {
