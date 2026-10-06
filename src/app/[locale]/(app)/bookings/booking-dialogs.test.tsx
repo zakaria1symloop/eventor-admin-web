@@ -69,6 +69,7 @@ function booking(over: Partial<BookingDetail> = {}): BookingDetail {
       status: "active",
     },
     eventDate: "2030-04-02",
+    endDate: null,
     startTime: "14:00",
     endTime: "23:00",
     eventType: "wedding",

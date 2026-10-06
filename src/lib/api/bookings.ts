@@ -92,6 +92,8 @@ export interface BookingRow {
   client: BookingClientRef;
   provider: BookingProviderRef;
   eventDate: string;
+  /** Last day of a multi-day booking (per-day services); null for one day. */
+  endDate: string | null;
   startTime: string | null;
   endTime: string | null;
   eventType: EventType;

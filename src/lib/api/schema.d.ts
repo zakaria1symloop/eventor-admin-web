@@ -5326,7 +5326,7 @@ export interface components {
              * @example CATEGORY_HAS_SERVICES
              * @enum {string}
              */
-            code: "VALIDATION_FAILED" | "BAD_REQUEST" | "SORT_FIELD_NOT_ALLOWED" | "NOT_FOUND" | "ROUTE_NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "STALE_UPDATE" | "UNPROCESSABLE" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "AUTH_TOKEN_MISSING" | "AUTH_TOKEN_INVALID" | "AUTH_TOKEN_EXPIRED" | "FORBIDDEN" | "FORBIDDEN_ROLE" | "NOT_OWNER" | "ACCOUNT_BLOCKED" | "AUTH_SESSION_REVOKED" | "AUTH_SESSION_REPLACED" | "AUTH_REFRESH_INVALID" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "PASSWORD_WEAK" | "RESET_TOKEN_INVALID" | "RESET_TOKEN_EXPIRED" | "INVITATION_INVALID" | "INVITATION_EXPIRED" | "INVITATION_NOT_FOUND" | "INVITATION_EXISTS" | "EMAIL_TAKEN" | "CURRENT_PASSWORD_INVALID" | "SESSION_NOT_FOUND" | "ADMIN_NOT_FOUND" | "CANNOT_REMOVE_SELF" | "LAST_ADMIN" | "SETTING_UNKNOWN" | "SETTINGS_CONFIRM_REQUIRED" | "AUDIT_LOG_NOT_FOUND" | "EXPORT_NOT_FOUND" | "SAVED_VIEW_NOT_FOUND" | "SAVED_VIEW_NAME_TAKEN" | "CATEGORY_NOT_FOUND" | "SLUG_TAKEN" | "CATEGORY_HAS_SERVICES" | "CATEGORY_MOVE_TARGET_INVALID" | "WILAYA_NOT_FOUND" | "WILAYA_CLOSE_CONFIRM_REQUIRED" | "COMMUNE_NOT_FOUND" | "COMMUNE_EXISTS" | "COMMUNE_IN_USE" | "CSV_HEADER_INVALID" | "CSV_TOO_MANY_ROWS" | "USER_NOT_FOUND" | "PHONE_TAKEN" | "ROLE_IMMUTABLE" | "NOT_A_PROVIDER" | "USER_ALREADY_BLOCKED" | "USER_NOT_BLOCKED" | "ACCOUNT_HAS_ACTIVE_ITEMS" | "TYPED_NAME_MISMATCH" | "BULK_ACTION_REFUSED" | "NOTE_NOT_FOUND" | "DOCUMENT_NOT_FOUND" | "DOCUMENT_INVALID_TRANSITION" | "FILE_NOT_FOUND" | "FILE_URL_INVALID" | "FILE_URL_EXPIRED" | "FILE_TOO_LARGE" | "FILE_TYPE_NOT_ALLOWED" | "FILE_NOT_READY" | "SERVICE_NOT_FOUND" | "CATEGORY_HIDDEN" | "WILAYA_CLOSED" | "SERVICE_PUBLISH_INVALID" | "SERVICE_INVALID_TRANSITION" | "FEATURED_LIMIT" | "SERVICE_HAS_BOOKINGS" | "SERVICE_IN_PACKS" | "PHOTO_LIMIT_REACHED" | "PHOTO_NOT_FOUND" | "PHOTO_ORDER_INVALID" | "AVAILABILITY_BLOCK_NOT_FOUND" | "AVAILABILITY_BLOCK_NOT_REMOVABLE" | "AVAILABILITY_DATE_PAST" | "AVAILABILITY_SERVICE_INVALID" | "PACK_NOT_FOUND" | "PACK_SERVICE_NOT_FOUND" | "PACK_SERVICE_OTHER_PROVIDER" | "PACK_PUBLISH_INVALID" | "PACK_WILAYA_NOT_COVERED" | "PACK_INVALID_TRANSITION" | "PACK_HAS_BOOKINGS" | "BOOKING_NOT_FOUND" | "BOOKING_INVALID_TRANSITION" | "BOOKING_NOT_EDITABLE" | "DATE_UNAVAILABLE" | "SERVICE_TIMES_REQUIRED" | "OUTSIDE_SERVICE_HOURS" | "OUTSIDE_SERVICE_PERIOD" | "SLOT_UNAVAILABLE" | "BOOKING_DUPLICATE" | "SERVICE_UNAVAILABLE_FOR_BOOKING" | "PACK_UNAVAILABLE" | "PROVIDER_NOT_ACCEPTING" | "MIN_NOTICE" | "BOOKING_DATE_PAST" | "NOT_A_CLIENT" | "BOOKING_EXTRA_INVALID" | "BOOKING_TOTAL_NEGATIVE" | "COMMUNE_WILAYA_MISMATCH" | "ACADEMIC_REQUEST_NOT_FOUND" | "USE_RESCHEDULE" | "RESCHEDULE_NOT_FOUND" | "RESCHEDULE_NOT_PENDING" | "RESCHEDULE_PENDING_EXISTS" | "REMINDER_TOO_SOON" | "INVOICE_NOT_FOUND" | "CONVERSATION_NOT_FOUND" | "MESSAGE_NOT_FOUND" | "MESSAGE_INVALID_TRANSITION" | "CONVERSATION_CLOSED" | "CONVERSATION_NOT_CLOSED" | "CONVERSATION_ALREADY_CLOSED" | "PARTICIPANT_NOT_FOUND" | "RECIPIENT_INVALID" | "DISPUTE_NOT_FOUND" | "DISPUTE_ALREADY_OPEN" | "BOOKING_NOT_DISPUTABLE" | "DISPUTE_WINDOW_CLOSED" | "DISPUTE_INVALID_TRANSITION" | "DISPUTE_PARTY_INVALID" | "DISPUTE_EVIDENCE_LIMIT" | "EVIDENCE_FILE_INVALID" | "FORM_NOT_FOUND" | "FORM_CLOSED" | "FORM_VERSION_NOT_FOUND" | "FORM_SCHEMA_INVALID" | "FORM_TRANSLATION_MISSING" | "FORM_INVALID_TRANSITION" | "FORM_HAS_SUBMISSIONS" | "FORM_DEFAULT_REQUIRED" | "FORM_ANSWERS_INVALID" | "FORM_SUBMISSION_LIMIT" | "FORM_REQUIRES_ACCOUNT" | "CODE_INVALID" | "CODE_EXPIRED" | "CODE_RESEND_TOO_SOON" | "UPLOAD_TOKEN_INVALID" | "EDIT_LINK_INVALID" | "ACADEMIC_REQUEST_INVALID_TRANSITION" | "ACADEMIC_REQUEST_FIELDS_INVALID" | "PROPOSAL_NOT_FOUND" | "PROPOSAL_EXISTS" | "PROPOSAL_BOOKED" | "REQUESTER_NOT_CLIENT" | "REVIEW_NOT_FOUND" | "REVIEW_INVALID_TRANSITION" | "REVIEW_NO_OPEN_REPORTS" | "REVIEW_REPLY_NOT_FOUND" | "REVIEW_REPLY_INVALID_TRANSITION" | "REPORT_NOT_FOUND" | "REPORT_INVALID_TRANSITION" | "REPORT_NOT_CONVERTIBLE" | "MESSAGE_NO_OPEN_REPORTS" | "OVERVIEW_RANGE_INVALID" | "FORBIDDEN_AUDIENCE" | "EMAIL_NOT_VERIFIED" | "EMAIL_ALREADY_VERIFIED" | "PASSWORD_ALREADY_SET" | "ROLE_NOT_ALLOWED_IN_APP" | "PROVIDER_FIELDS_REQUIRED" | "PROVIDER_FIELDS_NOT_ALLOWED" | "PROVIDER_NOT_FOUND" | "FAVOURITE_NOT_FOUND" | "FAVOURITE_TARGET_INVALID" | "BUDGET_NOT_FOUND" | "BUDGET_ITEM_NOT_FOUND" | "BUDGET_ITEM_LIMIT" | "BUDGET_BOOKING_ALREADY_LINKED" | "NOTIFICATION_NOT_FOUND" | "DEVICE_TOKEN_NOT_FOUND" | "MONTH_INVALID" | "PROVIDER_NOT_VERIFIED" | "CHECK_IN_NOT_ALLOWED" | "CHECK_IN_TOO_EARLY" | "CHECK_IN_DISPUTED" | "REVIEW_EXISTS" | "REVIEW_NOT_ALLOWED" | "REVIEW_WINDOW_CLOSED" | "REVIEW_EDIT_WINDOW_CLOSED" | "REVIEW_REPLY_EXISTS" | "REPORT_TARGET_NOT_FOUND" | "NOT_A_PARTICIPANT" | "CONVERSATION_READ_ONLY" | "DISPUTE_NOT_WITHDRAWABLE" | "BOOKING_TAB_INVALID";
+            code: "VALIDATION_FAILED" | "BAD_REQUEST" | "SORT_FIELD_NOT_ALLOWED" | "NOT_FOUND" | "ROUTE_NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "STALE_UPDATE" | "UNPROCESSABLE" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "AUTH_TOKEN_MISSING" | "AUTH_TOKEN_INVALID" | "AUTH_TOKEN_EXPIRED" | "FORBIDDEN" | "FORBIDDEN_ROLE" | "NOT_OWNER" | "ACCOUNT_BLOCKED" | "AUTH_SESSION_REVOKED" | "AUTH_SESSION_REPLACED" | "AUTH_REFRESH_INVALID" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "PASSWORD_WEAK" | "RESET_TOKEN_INVALID" | "RESET_TOKEN_EXPIRED" | "INVITATION_INVALID" | "INVITATION_EXPIRED" | "INVITATION_NOT_FOUND" | "INVITATION_EXISTS" | "EMAIL_TAKEN" | "CURRENT_PASSWORD_INVALID" | "SESSION_NOT_FOUND" | "ADMIN_NOT_FOUND" | "CANNOT_REMOVE_SELF" | "LAST_ADMIN" | "SETTING_UNKNOWN" | "SETTINGS_CONFIRM_REQUIRED" | "AUDIT_LOG_NOT_FOUND" | "EXPORT_NOT_FOUND" | "SAVED_VIEW_NOT_FOUND" | "SAVED_VIEW_NAME_TAKEN" | "CATEGORY_NOT_FOUND" | "SLUG_TAKEN" | "CATEGORY_HAS_SERVICES" | "CATEGORY_MOVE_TARGET_INVALID" | "WILAYA_NOT_FOUND" | "WILAYA_CLOSE_CONFIRM_REQUIRED" | "COMMUNE_NOT_FOUND" | "COMMUNE_EXISTS" | "COMMUNE_IN_USE" | "CSV_HEADER_INVALID" | "CSV_TOO_MANY_ROWS" | "USER_NOT_FOUND" | "PHONE_TAKEN" | "ROLE_IMMUTABLE" | "NOT_A_PROVIDER" | "USER_ALREADY_BLOCKED" | "USER_NOT_BLOCKED" | "ACCOUNT_HAS_ACTIVE_ITEMS" | "TYPED_NAME_MISMATCH" | "BULK_ACTION_REFUSED" | "NOTE_NOT_FOUND" | "DOCUMENT_NOT_FOUND" | "DOCUMENT_INVALID_TRANSITION" | "FILE_NOT_FOUND" | "FILE_URL_INVALID" | "FILE_URL_EXPIRED" | "FILE_TOO_LARGE" | "FILE_TYPE_NOT_ALLOWED" | "FILE_NOT_READY" | "SERVICE_NOT_FOUND" | "CATEGORY_HIDDEN" | "WILAYA_CLOSED" | "SERVICE_PUBLISH_INVALID" | "SERVICE_INVALID_TRANSITION" | "FEATURED_LIMIT" | "SERVICE_HAS_BOOKINGS" | "SERVICE_IN_PACKS" | "PHOTO_LIMIT_REACHED" | "PHOTO_NOT_FOUND" | "PHOTO_ORDER_INVALID" | "AVAILABILITY_BLOCK_NOT_FOUND" | "AVAILABILITY_BLOCK_NOT_REMOVABLE" | "AVAILABILITY_DATE_PAST" | "AVAILABILITY_SERVICE_INVALID" | "PACK_NOT_FOUND" | "PACK_SERVICE_NOT_FOUND" | "PACK_SERVICE_OTHER_PROVIDER" | "PACK_PUBLISH_INVALID" | "PACK_WILAYA_NOT_COVERED" | "PACK_INVALID_TRANSITION" | "PACK_HAS_BOOKINGS" | "BOOKING_NOT_FOUND" | "BOOKING_INVALID_TRANSITION" | "BOOKING_NOT_EDITABLE" | "DATE_UNAVAILABLE" | "MULTI_DAY_NOT_ALLOWED" | "BOOKING_TOO_LONG" | "SERVICE_TIMES_REQUIRED" | "OUTSIDE_SERVICE_HOURS" | "OUTSIDE_SERVICE_PERIOD" | "SLOT_UNAVAILABLE" | "BOOKING_DUPLICATE" | "SERVICE_UNAVAILABLE_FOR_BOOKING" | "PACK_UNAVAILABLE" | "PROVIDER_NOT_ACCEPTING" | "MIN_NOTICE" | "BOOKING_DATE_PAST" | "NOT_A_CLIENT" | "BOOKING_EXTRA_INVALID" | "BOOKING_TOTAL_NEGATIVE" | "COMMUNE_WILAYA_MISMATCH" | "ACADEMIC_REQUEST_NOT_FOUND" | "USE_RESCHEDULE" | "RESCHEDULE_NOT_FOUND" | "RESCHEDULE_NOT_PENDING" | "RESCHEDULE_PENDING_EXISTS" | "REMINDER_TOO_SOON" | "INVOICE_NOT_FOUND" | "CONVERSATION_NOT_FOUND" | "MESSAGE_NOT_FOUND" | "MESSAGE_INVALID_TRANSITION" | "CONVERSATION_CLOSED" | "CONVERSATION_NOT_CLOSED" | "CONVERSATION_ALREADY_CLOSED" | "PARTICIPANT_NOT_FOUND" | "RECIPIENT_INVALID" | "DISPUTE_NOT_FOUND" | "DISPUTE_ALREADY_OPEN" | "BOOKING_NOT_DISPUTABLE" | "DISPUTE_WINDOW_CLOSED" | "DISPUTE_INVALID_TRANSITION" | "DISPUTE_PARTY_INVALID" | "DISPUTE_EVIDENCE_LIMIT" | "EVIDENCE_FILE_INVALID" | "FORM_NOT_FOUND" | "FORM_CLOSED" | "FORM_VERSION_NOT_FOUND" | "FORM_SCHEMA_INVALID" | "FORM_TRANSLATION_MISSING" | "FORM_INVALID_TRANSITION" | "FORM_HAS_SUBMISSIONS" | "FORM_DEFAULT_REQUIRED" | "FORM_ANSWERS_INVALID" | "FORM_SUBMISSION_LIMIT" | "FORM_REQUIRES_ACCOUNT" | "CODE_INVALID" | "CODE_EXPIRED" | "CODE_RESEND_TOO_SOON" | "UPLOAD_TOKEN_INVALID" | "EDIT_LINK_INVALID" | "ACADEMIC_REQUEST_INVALID_TRANSITION" | "ACADEMIC_REQUEST_FIELDS_INVALID" | "PROPOSAL_NOT_FOUND" | "PROPOSAL_EXISTS" | "PROPOSAL_BOOKED" | "REQUESTER_NOT_CLIENT" | "REVIEW_NOT_FOUND" | "REVIEW_INVALID_TRANSITION" | "REVIEW_NO_OPEN_REPORTS" | "REVIEW_REPLY_NOT_FOUND" | "REVIEW_REPLY_INVALID_TRANSITION" | "REPORT_NOT_FOUND" | "REPORT_INVALID_TRANSITION" | "REPORT_NOT_CONVERTIBLE" | "MESSAGE_NO_OPEN_REPORTS" | "OVERVIEW_RANGE_INVALID" | "FORBIDDEN_AUDIENCE" | "EMAIL_NOT_VERIFIED" | "EMAIL_ALREADY_VERIFIED" | "PASSWORD_ALREADY_SET" | "ROLE_NOT_ALLOWED_IN_APP" | "PROVIDER_FIELDS_REQUIRED" | "PROVIDER_FIELDS_NOT_ALLOWED" | "PROVIDER_NOT_FOUND" | "FAVOURITE_NOT_FOUND" | "FAVOURITE_TARGET_INVALID" | "BUDGET_NOT_FOUND" | "BUDGET_ITEM_NOT_FOUND" | "BUDGET_ITEM_LIMIT" | "BUDGET_BOOKING_ALREADY_LINKED" | "NOTIFICATION_NOT_FOUND" | "DEVICE_TOKEN_NOT_FOUND" | "MONTH_INVALID" | "PROVIDER_NOT_VERIFIED" | "CHECK_IN_NOT_ALLOWED" | "CHECK_IN_TOO_EARLY" | "CHECK_IN_DISPUTED" | "REVIEW_EXISTS" | "REVIEW_NOT_ALLOWED" | "REVIEW_WINDOW_CLOSED" | "REVIEW_EDIT_WINDOW_CLOSED" | "REVIEW_REPLY_EXISTS" | "REPORT_TARGET_NOT_FOUND" | "NOT_A_PARTICIPANT" | "CONVERSATION_READ_ONLY" | "DISPUTE_NOT_WITHDRAWABLE" | "BOOKING_TAB_INVALID";
             /**
              * @description Translated with Accept-Language (en | ar).
              * @example This category still has 10 services.
@@ -7077,6 +7077,11 @@ export interface components {
             provider: components["schemas"]["BookingProviderRefDto"];
             /** @example 2026-12-20 */
             eventDate: string;
+            /**
+             * @description Last day of a multi-day booking; null for one day.
+             * @example null
+             */
+            endDate: string | null;
             /** @example 18:00 */
             startTime: string | null;
             /** @example 23:30 */
@@ -7361,6 +7366,11 @@ export interface components {
             pack: components["schemas"]["BookingPackRefDto"] | null;
             /** @example 2026-12-20 */
             eventDate: string;
+            /**
+             * @description Last day of a multi-day booking; null for one day.
+             * @example null
+             */
+            endDate: string | null;
             /** @example 18:00 */
             startTime: string | null;
             /** @example 23:30 */
@@ -7457,6 +7467,11 @@ export interface components {
             packId?: string;
             /** @example 2026-12-20 */
             eventDate: string;
+            /**
+             * @description Last day of a multi-day booking (per-day services only, at most 30 days, inclusive). Omit for one day.
+             * @example 2026-12-22
+             */
+            endDate?: string;
             /** @example 18:00 */
             startTime?: string;
             /** @example 23:30 */
@@ -12319,6 +12334,23 @@ export interface components {
              */
             unavailableReason: string | null;
             /**
+             * Format: date
+             * @description The first day of the range that is refused (multi-day quotes); null when available.
+             * @example null
+             */
+            unavailableDate: string | null;
+            /**
+             * @description Days covered: 1, or the length of a multi-day range (per-day services).
+             * @example 1
+             */
+            days: number;
+            /**
+             * Format: date
+             * @description Last day of a multi-day range; null for one day.
+             * @example null
+             */
+            endDate: string | null;
+            /**
              * @description Today + `booking_min_notice_days` (Africa/Algiers).
              * @example 2026-09-27
              */
@@ -12348,6 +12380,11 @@ export interface components {
              * @example 2026-11-14
              */
             eventDate: string;
+            /**
+             * @description Last day of a multi-day booking, inclusive (issues 3 #11). **`per_day` services only** (422 `MULTI_DAY_NOT_ALLOWED` otherwise), at most 30 days (422 `BOOKING_TOO_LONG`), not before `eventDate`. Priced per day; every day is checked and held. The times, when sent, apply to every day.
+             * @example 2026-11-16
+             */
+            endDate?: string;
             /**
              * @description `HH:mm`, Africa/Algiers. Drives the quantity of a `per_hour` service.
              * @example 18:00
@@ -12483,6 +12520,12 @@ export interface components {
              * @example 2026-11-14
              */
             eventDate: string;
+            /**
+             * Format: date
+             * @description Last day of a multi-day booking (per-day services); null for one day.
+             * @example null
+             */
+            endDate: string | null;
             /** @example 18:00 */
             startTime: string | null;
             /** @example 23:00 */
@@ -12586,6 +12629,11 @@ export interface components {
              */
             eventDate: string;
             /**
+             * @description Last day of a multi-day booking, inclusive (issues 3 #11). **`per_day` services only** (422 `MULTI_DAY_NOT_ALLOWED` otherwise), at most 30 days (422 `BOOKING_TOO_LONG`), not before `eventDate`. Priced per day; every day is checked and held. The times, when sent, apply to every day.
+             * @example 2026-11-16
+             */
+            endDate?: string;
+            /**
              * @description `HH:mm`, Africa/Algiers. Drives the quantity of a `per_hour` service.
              * @example 18:00
              */
@@ -12638,6 +12686,12 @@ export interface components {
              * @example 2026-11-14
              */
             eventDate: string;
+            /**
+             * Format: date
+             * @description Last day of a multi-day booking (per-day services); null for one day.
+             * @example null
+             */
+            endDate: string | null;
             /** @example 18:00 */
             startTime: string | null;
             /** @example 23:00 */

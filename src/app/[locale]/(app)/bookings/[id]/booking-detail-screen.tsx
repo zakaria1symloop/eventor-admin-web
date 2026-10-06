@@ -59,7 +59,7 @@ import {
   RescheduleDialog,
   StatusDialog,
 } from "../booking-dialogs";
-import { statusTarget } from "../bookings-screen";
+import { formatEventDates, statusTarget } from "../bookings-screen";
 
 const actionIcon: Record<StatusAction, ReactNode> = {
   accepted: <Check />,
@@ -220,7 +220,9 @@ export function BookingDetailScreen({ id }: { id: string }) {
             {td("requested", {
               date: formatDateTime(b.createdAt, locale),
               source: t(`sources.${b.source}`),
-              event: formatDate(`${b.eventDate}T12:00:00`, locale),
+              event: b.endDate
+                ? `${formatDate(`${b.eventDate}T12:00:00`, locale)} – ${formatDate(`${b.endDate}T12:00:00`, locale)}`
+                : formatDate(`${b.eventDate}T12:00:00`, locale),
             })}
             {b.createdBy && ` · ${td("createdBy", { name: b.createdBy.fullName })}`}
           </p>
@@ -397,7 +399,8 @@ function BookingTimeline({ booking: b }: { booking: BookingDetail }) {
   const failed = b.status === "declined" || b.status === "cancelled";
   const decision = b.timeline.find((e) => e.type === "status" && e.fromStatus === "pending");
   const today = new Date().toISOString().slice(0, 10);
-  const eventPassed = b.eventDate < today;
+  // A multi-day booking has passed once its last day has.
+  const eventPassed = (b.endDate ?? b.eventDate) < today;
   const steps: TimelineStep[] = [
     { key: "requested", label: td("requested"), sub: short(b.createdAt), state: "done" },
     {
@@ -427,7 +430,9 @@ function BookingTimeline({ booking: b }: { booking: BookingDetail }) {
     {
       key: "event",
       label: td("eventDay"),
-      sub: formatDate(`${b.eventDate}T12:00:00`, locale),
+      sub: b.endDate
+        ? `${formatDate(`${b.eventDate}T12:00:00`, locale)} – ${formatDate(`${b.endDate}T12:00:00`, locale)}`
+        : formatDate(`${b.eventDate}T12:00:00`, locale),
       state: failed
         ? "next"
         : b.status === "completed" || (b.status === "accepted" && eventPassed)
@@ -605,12 +610,7 @@ function EventDetailsCard({ booking: b, onEdit }: { booking: BookingDetail; onEd
       <dd className="min-w-0 text-end text-ink">{value}</dd>
     </div>
   );
-  const date = new Intl.DateTimeFormat(intlLocale(locale), {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(`${b.eventDate}T12:00:00`));
+  const date = formatEventDates(b, locale);
   const place = [b.locationText, b.commune ? localName(b.commune, locale) : null, localName(b.wilaya, locale)]
     .filter((v, i, all): v is string => !!v && all.indexOf(v) === i)
     .join(", ");

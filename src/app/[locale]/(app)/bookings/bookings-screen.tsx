@@ -88,15 +88,19 @@ export function statusTarget(b: BookingRow | BookingDetail): StatusTarget {
   return { id: b.id, reference: b.reference, clientName: b.client.fullName, status: b.status };
 }
 
-/** "Sat 14 Mar 2026" + "13:00 → 23:00" */
-export function EventDateCell({ b }: { b: Pick<BookingRow, "eventDate" | "startTime" | "endTime"> }) {
+/** "Sat 14 Mar 2026", or "Sat 14 Mar 2026 – Mon 16 Mar 2026" for a multi-day booking. */
+export function formatEventDates(b: Pick<BookingRow, "eventDate" | "endDate">, locale: string): string {
+  const format = (d: string) =>
+    new Intl.DateTimeFormat(intlLocale(locale), { weekday: "short", day: "2-digit", month: "short", year: "numeric" }).format(
+      new Date(`${d}T12:00:00`),
+    );
+  return b.endDate ? `${format(b.eventDate)} – ${format(b.endDate)}` : format(b.eventDate);
+}
+
+/** "Sat 14 Mar 2026" (or a range) + "13:00 → 23:00" */
+export function EventDateCell({ b }: { b: Pick<BookingRow, "eventDate" | "endDate" | "startTime" | "endTime"> }) {
   const locale = useLocale();
-  const date = new Intl.DateTimeFormat(intlLocale(locale), {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(`${b.eventDate}T12:00:00`));
+  const date = formatEventDates(b, locale);
   const times =
     b.startTime && b.endTime ? `${b.startTime.slice(0, 5)} → ${b.endTime.slice(0, 5)}` : undefined;
   return <StackCell primary={date} secondary={times && <span dir="ltr">{times}</span>} />;
