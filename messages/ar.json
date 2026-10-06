@@ -1634,6 +1634,17 @@
       "noPacks": "لا توجد باقات جاهزة بعد.",
       "packLine": "{count, plural, one {خدمة واحدة} other {# خدمات}} · {price}",
       "needsAttention": "تحتاج إلى متابعة"
+    },
+    "photo": {
+      "add": "إضافة صورة",
+      "change": "تغيير الصورة",
+      "remove": "حذف الصورة",
+      "replaced": "تم تحديث الصورة.",
+      "removed": "تم حذف الصورة.",
+      "removeTitle": "حذف صورة {name}؟",
+      "removeDescription": "سيعود ملفه الشخصي إلى الأحرف الأولى في التطبيق ولوحة التحكم. يمكنه رفع صورة جديدة من التطبيق.",
+      "noteLabel": "ملاحظة لسجل النشاط (اختياري)",
+      "notePlaceholder": "مثال: الصورة لا تُظهر الشخص"
     }
   },
   "verifications": {
@@ -4225,5 +4236,11 @@
       "exportSummary": "{count} بلاغ · تبويب {tab}",
       "exportNote": "ملاحظة"
     }
+  },
+  "avatar": {
+    "change": "تغيير الصورة",
+    "remove": "حذف الصورة",
+    "updated": "تم تحديث الصورة.",
+    "removed": "تم حذف الصورة."
   }
 }

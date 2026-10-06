@@ -304,6 +304,18 @@ export async function blockUser(id: string, body: BlockBody): Promise<BlockResul
   return (await api.post<DataResponse<BlockResult>>(`/admin/users/${id}/block`, body)).data;
 }
 
+/** POST /admin/users/:id/avatar (multipart `file`): replace a client's or provider's photo. */
+export async function replaceUserAvatar(id: string, file: File): Promise<UserDetail> {
+  const form = new FormData();
+  form.append("file", file);
+  return (await api.post<DataResponse<UserDetail>>(`/admin/users/${id}/avatar`, form)).data;
+}
+
+/** DELETE /admin/users/:id/avatar `{ note? }`: remove it (e.g. inappropriate); the note goes to the activity log. */
+export async function removeUserAvatar(id: string, note?: string): Promise<UserDetail> {
+  return (await api.delete<DataResponse<UserDetail>>(`/admin/users/${id}/avatar`, { body: { note: note || undefined } })).data;
+}
+
 export async function unblockUser(id: string): Promise<UserDetail> {
   return (await api.post<DataResponse<UserDetail>>(`/admin/users/${id}/unblock`)).data;
 }

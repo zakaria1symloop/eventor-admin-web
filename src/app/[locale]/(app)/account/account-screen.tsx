@@ -13,6 +13,7 @@ import { Pill } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, Select, TextInput } from "@/components/forms/fields";
 import { EmailInput, PasswordInput } from "@/components/forms/inputs";
+import { AvatarField } from "@/components/forms/avatar-field";
 import { Banner } from "@/components/feedback/banner";
 import { CardSkeleton, ErrorState } from "@/components/feedback/states";
 import { toast } from "@/components/feedback/toast";
@@ -21,8 +22,10 @@ import {
   changePassword,
   getSessions,
   isStrongPassword,
+  removeMyAvatar,
   revokeSession,
   updateMe,
+  uploadMyAvatar,
   type AdminLanguage,
   type AdminMe,
   type AdminSession,
@@ -30,7 +33,7 @@ import {
 import { ApiError } from "@/lib/api/errors";
 import { applyApiFieldErrors } from "@/lib/auth/form-errors";
 import { useSession, useSignOut } from "@/lib/auth/use-session";
-import { formatRelative, initials } from "@/lib/utils/format";
+import { formatRelative } from "@/lib/utils/format";
 
 export function AccountScreen() {
   const session = useSession();
@@ -132,9 +135,12 @@ function ProfileCard({ me }: { me: AdminMe }) {
       <CardBody className="pt-0">
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
           {formError && <Banner tone="red" title={formError} />}
-          <span className="flex size-14 items-center justify-center rounded-full bg-brand-soft text-18 font-semibold text-brand">
-            {initials(watchedName || me.fullName)}
-          </span>
+          <AvatarField
+            name={watchedName || me.fullName}
+            src={me.avatarUrl}
+            onUpload={async (file) => queryClient.setQueryData(authKeys.me(), await uploadMyAvatar(file))}
+            onRemove={async () => queryClient.setQueryData(authKeys.me(), await removeMyAvatar())}
+          />
           <Field label={t("fullName")} error={errors.fullName?.message}>
             <TextInput autoComplete="name" {...form.register("fullName")} />
           </Field>

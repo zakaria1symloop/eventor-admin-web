@@ -92,6 +92,18 @@ export async function updateMe(body: UpdateMeBody): Promise<AdminMe> {
   return (await api.patch<DataResponse<AdminMe>>("/admin/me", body)).data;
 }
 
+/** POST /admin/me/avatar (multipart `file`): my photo, returns my account. */
+export async function uploadMyAvatar(file: File): Promise<AdminMe> {
+  const form = new FormData();
+  form.append("file", file);
+  return (await api.post<DataResponse<AdminMe>>("/admin/me/avatar", form)).data;
+}
+
+/** DELETE /admin/me/avatar: back to initials. */
+export async function removeMyAvatar(): Promise<AdminMe> {
+  return (await api.delete<DataResponse<AdminMe>>("/admin/me/avatar")).data;
+}
+
 export function changePassword(currentPassword: string, newPassword: string): Promise<void> {
   return api.post<void>("/admin/me/password", { currentPassword, newPassword });
 }

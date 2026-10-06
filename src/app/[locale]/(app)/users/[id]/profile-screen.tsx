@@ -50,6 +50,8 @@ import { listServices, serviceKeys } from "@/lib/api/services";
 import {
   addNote,
   deleteNote,
+  removeUserAvatar,
+  replaceUserAvatar,
   unblockUser,
   userKeys,
   type DocumentType,
@@ -77,11 +79,12 @@ import {
   type UserTarget,
 } from "../user-dialogs";
 import { EditUserDrawer } from "../user-form-dialogs";
+import { useImagePicker } from "@/components/forms/avatar-field";
 import { localName } from "../use-user-options";
 import { useUser } from "../use-user";
 import { verificationDomainStatus } from "../users-screen";
 
-type Overlay = "block" | "delete" | "reset" | "signout" | "unblock" | null;
+type Overlay = "block" | "delete" | "reset" | "signout" | "unblock" | "removePhoto" | null;
 
 export function ProfileScreen({ id }: { id: string }) {
   const t = useTranslations("users");
@@ -94,6 +97,10 @@ export function ProfileScreen({ id }: { id: string }) {
   const [overlay, setOverlay] = useState<Overlay>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: userKeys.all });
+  const photo = useImagePicker(async (file) => {
+    await replaceUserAvatar(id, file);
+    await invalidate();
+  }, t("photo.replaced"));
 
   if (query.isPending) {
     return (
@@ -158,6 +165,8 @@ export function ProfileScreen({ id }: { id: string }) {
       ...(provider
         ? [{ icon: <FileText />, label: t("menu.reviewDocuments"), href: `/verifications/${u.id}` }]
         : []),
+      { icon: <Camera />, label: u.avatarUrl ? t("photo.change") : t("photo.add"), onSelect: photo.pick },
+      ...(u.avatarUrl ? [{ icon: <Trash2 />, label: t("photo.remove"), onSelect: () => setOverlay("removePhoto") }] : []),
       { icon: <Settings />, label: t("menu.resetPassword"), onSelect: () => setOverlay("reset") },
       { icon: <LogOut />, label: t("menu.signOut"), onSelect: () => setOverlay("signout") },
       { icon: <UserRound />, label: tp("actions.impersonate"), disabled: true, hint: tp("soon") },
@@ -394,6 +403,22 @@ export function ProfileScreen({ id }: { id: string }) {
         user={target}
         open={overlay === "signout"}
         onOpenChange={(o) => !o && setOverlay(null)}
+      />
+      {photo.input}
+      <ConfirmDialog
+        open={overlay === "removePhoto"}
+        onOpenChange={(o) => !o && setOverlay(null)}
+        icon={<Trash2 />}
+        tone="danger"
+        title={t("photo.removeTitle", { name: u.fullName })}
+        description={t("photo.removeDescription")}
+        messageField={{ label: t("photo.noteLabel"), placeholder: t("photo.notePlaceholder") }}
+        confirmLabel={t("photo.remove")}
+        onConfirm={async ({ message }) => {
+          await removeUserAvatar(u.id, message.trim());
+          toast.success(t("photo.removed"));
+          void invalidate();
+        }}
       />
       <ConfirmDialog
         open={overlay === "unblock"}

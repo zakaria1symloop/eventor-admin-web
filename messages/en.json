@@ -1634,6 +1634,17 @@
       "noPacks": "No Ready Packs yet.",
       "packLine": "{count, plural, one {# service} other {# services}} · {price}",
       "needsAttention": "Needs attention"
+    },
+    "photo": {
+      "add": "Add photo",
+      "change": "Change photo",
+      "remove": "Remove photo",
+      "replaced": "Photo updated.",
+      "removed": "Photo removed.",
+      "removeTitle": "Remove {name}’s photo?",
+      "removeDescription": "Their profile goes back to initials in the app and the dashboard. They can upload a new photo from the app.",
+      "noteLabel": "Note for the activity log (optional)",
+      "notePlaceholder": "e.g. The photo did not show the person"
     }
   },
   "verifications": {
@@ -4225,5 +4236,11 @@
       "exportSummary": "{count} reports · Tab {tab}",
       "exportNote": "Note"
     }
+  },
+  "avatar": {
+    "change": "Change photo",
+    "remove": "Remove photo",
+    "updated": "Photo updated.",
+    "removed": "Photo removed."
   }
 }

@@ -33,7 +33,7 @@ function SessionShell({ children }: { children: ReactNode }) {
   const t = useTranslations("account");
   const session = useSession({ enabled: AUTH_ENABLED });
   const signOut = useSignOut();
-  const account = session.data ? { name: session.data.fullName, role: t("role") } : undefined;
+  const account = session.data ? { name: session.data.fullName, role: t("role"), avatarUrl: session.data.avatarUrl } : undefined;
   const ready = !AUTH_ENABLED || !!session.data;
   const counts = useQuery({
     queryKey: overviewKeys.navCounts(),

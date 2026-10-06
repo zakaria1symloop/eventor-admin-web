@@ -15,6 +15,8 @@ export { NotificationBell } from "./notification-panel";
 export interface AccountSummary {
   name: string;
   role?: string;
+  /** Photo URL; initials when absent. */
+  avatarUrl?: string | null;
 }
 
 function initials(name: string) {
@@ -44,9 +46,14 @@ export function AccountMenu({ account, onSignOut }: { account: AccountSummary; o
           aria-label={tt("accountMenu")}
           className="flex h-10 items-center gap-2.5 rounded-md ps-1 pe-2 text-start hover:bg-canvas"
         >
-          <span className="flex size-9 items-center justify-center rounded-full bg-brand-soft text-13 font-semibold text-brand">
-            {initials(account.name)}
-          </span>
+          {account.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={account.avatarUrl} alt="" className="size-9 rounded-full object-cover" />
+          ) : (
+            <span className="flex size-9 items-center justify-center rounded-full bg-brand-soft text-13 font-semibold text-brand">
+              {initials(account.name)}
+            </span>
+          )}
           <span className="hidden leading-tight md:block">
             <span className="block text-13 font-medium text-ink">{account.name}</span>
             <span className="block text-12 text-muted">{account.role ?? t("role")}</span>
