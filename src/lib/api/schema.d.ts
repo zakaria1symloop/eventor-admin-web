@@ -39,7 +39,7 @@ export interface paths {
         put?: never;
         /**
          * Sign in to the dashboard
-         * @description Public route. Admin accounts only. Sets the httpOnly, SameSite=Strict refresh cookie `eventor_admin_rt` (path `/api/v1/admin/auth`, Secure in production; 30 days with `remember`, otherwise a browser-session cookie). 5 failed attempts for an email within 15 min lock it for 15 min (429 ACCOUNT_LOCKED with `details.retryAfterSeconds` and `Retry-After`). Used by AUTH-01.
+         * @description Public route. Admin accounts only. Sets the httpOnly, SameSite=Strict refresh cookie `eventor_admin_rt` (path `/api/v1/admin/auth`, Secure in production; 30 days with `remember`, otherwise a browser-session cookie). 5 failed attempts for an email within 15 min lock it for 15 min (429 ACCOUNT_LOCKED with `details.retryAfterSeconds` and `Retry-After`). One dashboard session per admin: signing in ends the session on any other computer, which then gets 401 `AUTH_SESSION_REPLACED`. Used by AUTH-01.
          */
         post: operations["AdminAuthController_login"];
         delete?: never;
@@ -248,6 +248,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Liveness (alias)
+         * @description Public. An alias of `GET /health/live`, so `GET {API_URL}/api/v1/health` answers 200 instead of 404.
+         */
+        get: operations["HealthController_root"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health/live": {
         parameters: {
             query?: never;
@@ -277,7 +297,7 @@ export interface paths {
         };
         /**
          * Readiness
-         * @description Public. The database answers.
+         * @description Public. The database answers; `queue` and `mail` say which drivers are configured (`mail: "console"` means no SMTP — no email leaves the server).
          */
         get: operations["HealthController_ready"];
         put?: never;
@@ -310,6 +330,30 @@ export interface paths {
          * @description Name, email and language. Changing the email needs `currentPassword`. Used by SET-01.
          */
         patch: operations["AdminMeController_update"];
+        trace?: never;
+    };
+    "/api/v1/admin/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change my photo
+         * @description Account page and top bar. `max_photo_upload_mb`, type sniffed from the bytes, WebP variants built in the background, previous photo deleted. Returns my account.
+         */
+        post: operations["AdminMeController_uploadAvatar"];
+        /**
+         * Remove my photo
+         * @description Back to initials. Returns my account.
+         */
+        delete: operations["AdminMeController_removeAvatar"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/me/password": {
@@ -403,7 +447,7 @@ export interface paths {
         put?: never;
         /**
          * Invite an admin
-         * @description Emails a 72 h invitation link (`${ADMIN_URL}/{locale}/accept-invitation?token=…`). Returns the new list row. Used by SET-05.
+         * @description Emails a 72 h invitation link (`${ADMIN_URL}/{locale}/accept-invitation?token=…`). Returns the new list row. Rate limited to `MAIL_THROTTLE_LIMIT` (20) per minute: this route sends mail to an address the caller chooses. Used by SET-05.
          */
         post: operations["AdminAdminsController_invite"];
         delete?: never;
@@ -423,7 +467,7 @@ export interface paths {
         put?: never;
         /**
          * Resend an invitation
-         * @description New token and a fresh 72 h expiry; the old link stops working. Used by SET-05.
+         * @description New token and a fresh 72 h expiry; the old link stops working. Rate limited to `MAIL_THROTTLE_LIMIT` (20) per minute. Used by SET-05.
          */
         post: operations["AdminAdminsController_resend"];
         delete?: never;
@@ -987,6 +1031,30 @@ export interface paths {
          */
         post: operations["AdminUsersController_block"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{id}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace a user’s photo
+         * @description Same rules as the app’s own upload: `max_photo_upload_mb`, type sniffed from the bytes, WebP variants built in the background, previous photo deleted. Audited as `user.avatar_replaced`. Returns the profile (user page).
+         */
+        post: operations["AdminUsersController_replaceAvatar"];
+        /**
+         * Remove a user’s photo
+         * @description E.g. an inappropriate picture. The optional `note` goes to the activity log (`user.avatar_removed`). Returns the profile (user page).
+         */
+        delete: operations["AdminUsersController_removeAvatar"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3024,6 +3092,2226 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a client or provider account
+         * @description Public route. Screen 08 Register · client and 08a Register · provider. Creates the account **unverified**, emails a 6-digit code (15 min, 5 tries) and returns where it went, so the app can go straight to screen 10 Verify code. No tokens are issued until the email is verified. A provider must send `businessName` and `categoryId`; their three documents are uploaded afterwards with `POST /app/me/documents` (screen 08a), which needs the token from `POST /app/auth/verify-email`.
+         */
+        post: operations["AppAuthController_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/auth/verify-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify the email address and sign in
+         * @description Public route. Screen 10 Verify code. Consumes the code and signs the account in. Returns `refreshToken` **in the body** (mobile has no cookie jar): store it in the OS keychain / keystore, never in plain preferences. It rotates on every `/app/auth/refresh`, and replaying a rotated one revokes the whole session.
+         */
+        post: operations["AppAuthController_verifyEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/auth/verify-email/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send the verification code again
+         * @description Public route. Screen 10 "Didn’t get the code? Resend". One code per 60 s per address (429 `CODE_RESEND_TOO_SOON` with `details.retryAfterSeconds`), on top of the per-IP auth limit. Answers the same shape for an unknown or already verified address, so it cannot be used to test whether an account exists.
+         */
+        post: operations["AppAuthController_resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in
+         * @description Public route. Screen 07 Login. Client and provider accounts only. Returns `refreshToken` **in the body** (mobile has no cookie jar): store it in the OS keychain / keystore, never in plain preferences. It rotates on every `/app/auth/refresh`, and replaying a rotated one revokes the whole session. 5 failed attempts for an email within 15 min lock it for 15 min (429 `ACCOUNT_LOCKED`, `details.retryAfterSeconds`). An unverified account gets 403 `EMAIL_NOT_VERIFIED` with `details.email` — send the user to screen 10 and call `/app/auth/verify-email/resend`. A blocked account gets 403 `ACCOUNT_BLOCKED` with `details: { reason, message, blockedUntil }` — show `message` (the admin’s own words) and `blockedUntil` (ISO date-time, null for an indefinite block).
+         */
+        post: operations["AppAuthController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get a new access token
+         * @description Public route authenticated by the refresh token in the body (screen 01 Splash restores the session with it). Returns `refreshToken` **in the body** (mobile has no cookie jar): store it in the OS keychain / keystore, never in plain preferences. It rotates on every `/app/auth/refresh`, and replaying a rotated one revokes the whole session. A refresh token minted for the dashboard is refused.
+         */
+        post: operations["AppAuthController_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out
+         * @description Public route. Revokes the session behind the `refreshToken` in the body, or the one of the bearer token when the body is empty. Always 204, so signing out never fails on the device. Remove the FCM token first with `DELETE /app/me/device-tokens/:token`.
+         */
+        post: operations["AppAuthController_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/auth/forgot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a password reset code
+         * @description Public route. Screen 09 Forgot password. **Always 202**, whether or not the address has an account, so it cannot be used to discover one. When it does, emails a 6-digit code valid 15 min, then screen 10a Set new password.
+         */
+        post: operations["AppAuthController_forgot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/auth/reset/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check a reset code before asking for the new password
+         * @description Public route. Screen 10a: validate the emailed code **before** the user types a new password twice. 204 when the code is valid — it is **not consumed**, so the same code then works on `POST /app/auth/reset`. A wrong code still burns one of the 5 attempts (422 `CODE_INVALID`); a spent or stale one answers 422 `CODE_EXPIRED`.
+         */
+        post: operations["AppAuthController_verifyReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/auth/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set a new password with the emailed code
+         * @description Public route. Screen 10a Set new password. Consumes the code and revokes **every** session, so the user signs in again with the new password.
+         */
+        post: operations["AppAuthController_reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/auth/set-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Choose a password for an account an admin created
+         * @description Public route. The account has no password yet and was emailed `${APP_PUBLIC_URL}/set-password?token=…` (valid 7 days, single use). Sets the password, marks the email verified and signs in. Returns `refreshToken` **in the body** (mobile has no cookie jar): store it in the OS keychain / keystore, never in plain preferences. It rotates on every `/app/auth/refresh`, and replaying a rotated one revokes the whole session.
+         */
+        post: operations["AppAuthController_setPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My account
+         * @description Screen 21a Home · Provider · Pending and the Profile tab. Carries `verificationStatus`, the provider profile when the account is one, and the two unread counters the tab bar badges.
+         */
+        get: operations["AppMeController_profile"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete my account
+         * @description Profile · Delete account, confirmed with the current password. Soft delete with the same guards as the admin route: an upcoming booking or an open dispute refuses it with 409 `ACCOUNT_HAS_ACTIVE_ITEMS` and the counts. Pending bookings are cancelled, every session is revoked, and personal data is anonymised after 30 days — reviews and bookings stay, attributed to "Deleted user".
+         */
+        delete: operations["AppMeController_remove"];
+        options?: never;
+        head?: never;
+        /**
+         * Update my profile
+         * @description Profile · Edit. Name, phone, language, wilaya and the avatar (send a `avatarFileId` from `POST /app/me/avatar`, or `null` to remove it). The role and the email are immutable here.
+         */
+        patch: operations["AppMeController_update"];
+        trace?: never;
+    };
+    "/api/v1/app/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change my password
+         * @description Profile · Change password. Signs out every **other** session; this one keeps working.
+         */
+        post: operations["AppMeController_changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload my avatar
+         * @description Profile · Edit. The type is sniffed from the bytes, not the extension; the image is converted to WebP with `thumb` (320 px) and `medium` (800 px) variants by a background job, so `avatarUrl` may serve the original for a moment. The previous avatar is deleted. Returns the refreshed profile.
+         */
+        post: operations["AppMeController_avatar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My signed-in devices
+         * @description Profile · Security. App sessions only; the dashboard’s are never listed.
+         */
+        get: operations["AppMeController_sessions"];
+        put?: never;
+        post?: never;
+        /**
+         * Sign out my other devices
+         * @description Revokes every app session except the one making the call.
+         */
+        delete: operations["AppMeController_revokeOtherSessions"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Sign out one device
+         * @description Revokes one of my app sessions.
+         */
+        delete: operations["AppMeController_revokeSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My verification documents
+         * @description Screens 08c/08d Resubmit documents and 21a Pending. One entry per required type — `national_id`, `commercial_register_or_artisan_card`, `tax_card` — each with its status (`missing` when nothing was sent), the reject reason with a translated label, the admin’s note and when it was reviewed. Providers only.
+         */
+        get: operations["AppMeController_documents"];
+        put?: never;
+        /**
+         * Send (or resend) a verification document
+         * @description Screens 08a Register · provider and 08d Resubmit documents. Stores a **new current version**, back to `pending`; the previous one is kept as history for the admin. The account’s `verificationStatus` is recomputed from the current documents (status-rules §2), so a resubmission moves a rejected provider back to `pending`. Returns the whole document list, ready for the screen.
+         */
+        post: operations["AppMeController_uploadDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/device-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register this device for push
+         * @description Screen 16 Notifications / app start. Idempotent: sending the same token again refreshes it and moves it to this account (a shared phone). Call `DELETE` on sign-out so the next user does not get these pushes.
+         */
+        post: operations["AppMeController_registerDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/device-tokens/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop push on this device
+         * @description Call it before `POST /app/auth/logout`.
+         */
+        delete: operations["AppMeController_removeDevice"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/notification-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My notification settings
+         * @description Profile · Notifications. Everything is on until the user changes it; security emails are never muted.
+         */
+        get: operations["AppMeController_notificationPreferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change my notification settings
+         * @description Profile · Notifications. Send only the switches that changed.
+         */
+        patch: operations["AppMeController_updateNotificationPreferences"];
+        trace?: never;
+    };
+    "/api/v1/app/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My notifications
+         * @description Screen 16 Notifications. Newest first, each row carrying `group` (`today` | `this_week` | `earlier`, Africa/Algiers) so the app renders the three sections without recomputing dates, and `data` for the deep link.
+         */
+        get: operations["AppMeController_notifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unread notification count
+         * @description The bell badge on screen 11 Home.
+         */
+        get: operations["AppMeController_unreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark notifications read
+         * @description Screen 16 "Mark all read" (`all: true`) or tapping one row (`ids`). Already-read rows are left alone.
+         */
+        post: operations["AppMeController_markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/notifications/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a notification
+         * @description Screen 16, swipe-to-delete. Removes one of **my** notifications for good (hard delete) — it will not come back on the next sync.
+         */
+        delete: operations["AppMeController_deleteNotification"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/favourites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My favourites
+         * @description Screen 17 Favorites. Services and packs together, newest first. A row whose target stopped being visible stays in the list with `available: false`, so the grid does not silently shrink. `categoryId` is the chip row (services only, since packs have no single category).
+         */
+        get: operations["AppMeController_listFavourites"];
+        put?: never;
+        /**
+         * Add a favourite
+         * @description The ♥ on screens 12, 13, 19 and 20. Exactly one of `serviceId` / `packId`. Idempotent: favouriting twice returns the same row rather than an error.
+         */
+        post: operations["AppMeController_addFavourite"];
+        /**
+         * Remove a favourite by its target
+         * @description Un-save straight from a card: `?serviceId=` or `?packId=` (exactly one), no favourite row id needed. **Idempotent** — removing something that is not saved still answers 204, so a double tap on ♥ never errors.
+         */
+        delete: operations["AppMeController_removeFavouriteByTarget"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/favourites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a favourite
+         * @description Screen 17, the ♥ on a card. `:id` is the **favourite** id, not the service id (or use `DELETE /app/me/favourites?serviceId=`).
+         */
+        delete: operations["AppMeController_removeFavourite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My budget
+         * @description Screen 18 Budget. **Private to its owner**: there is no endpoint, admin or otherwise, that reads somebody else’s budget. 404 `BUDGET_NOT_FOUND` until the client creates one with `PUT`.
+         */
+        get: operations["AppMeController_getBudget"];
+        /**
+         * Create or update my budget
+         * @description Screen 18 header · Edit. One budget per client: the first call creates it, later ones replace title, date and plan.
+         */
+        put: operations["AppMeController_putBudget"];
+        post?: never;
+        /**
+         * Delete my budget
+         * @description Screen 18f. Deletes the budget and all its lines for good; linked bookings are not touched. Afterwards `GET` answers 404 `BUDGET_NOT_FOUND` and Home shows "Plan your budget" again. 404 `BUDGET_NOT_FOUND` when there is none (treat as already deleted).
+         */
+        delete: operations["AppMeController_deleteBudget"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/budget/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a budget line
+         * @description Screen 18 "+ Add an expense". `bookingId` links the line to one of **my** bookings, which is what makes it count in "3 of 6 services booked" and fills `providerName`.
+         */
+        post: operations["AppMeController_addBudgetItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/budget/items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a budget line
+         * @description Screen 18. Returns the recomputed budget so the header updates in one round trip.
+         */
+        delete: operations["AppMeController_removeBudgetItem"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a budget line
+         * @description Screen 18, tapping a line. Send only the fields that changed.
+         */
+        patch: operations["AppMeController_updateBudgetItem"];
+        trace?: never;
+    };
+    "/api/v1/app/me/academic-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My event requests
+         * @description The academic requests **this account** submitted through the web form while signed in (linked by `requester_id`), newest first. Requests sent without an account are not listed — they are followed by email.
+         */
+        get: operations["AppAcademicController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/academic-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One of my event requests
+         * @description The request with its answers rendered through the **form version it was submitted with** (immutable, status-rules §7), so the app can show exactly what was sent. Somebody else’s request answers 404 — the API does not confirm it exists.
+         */
+        get: operations["AppAcademicController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everything screen 11 Home · Client needs, in one call
+         * @description Screen 11 Home · Client. One round trip instead of six: greeting and wilaya, the category chips, the next `2` bookings, the budget summary, the best-saving Ready Packs and the top-rated services in the user’s wilaya (all services when they have not set one), plus the unread counters. Text comes back in the caller’s language: `Accept-Language: ar|en`, then the signed-in account’s `language`, then `en`. The `*En` / `*Ar` fields are always present too, for screens that show both.
+         */
+        get: operations["AppCatalogController_home"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Category chips
+         * @description Public. Screen 11 Home and 11a Filters. Visible categories in their configured order, each with how many visible services it holds. Text comes back in the caller’s language: `Accept-Language: ar|en`, then the signed-in account’s `language`, then `en`. The `*En` / `*Ar` fields are always present too, for screens that show both.
+         */
+        get: operations["AppCatalogController_categories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/wilayas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open wilayas
+         * @description Public. The city selector on screen 11 and the wilaya filter on 11a. Only wilayas open for bookings, each with `servicesCount` (services visible in the app that cover it). The list is ordered by that count, highest first — use the top rows as "top wilayas"; there is no separate `position`. Text comes back in the caller’s language: `Accept-Language: ar|en`, then the signed-in account’s `language`, then `en`. The `*En` / `*Ar` fields are always present too, for screens that show both.
+         */
+        get: operations["AppCatalogController_wilayas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/wilayas/{code}/communes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Communes of a wilaya
+         * @description Public. The commune picker of the booking sheet: `POST /app/bookings` takes one of these ids as `communeId` (it must belong to the booking's `wilayaCode`, 422 `COMMUNE_WILAYA_MISMATCH` otherwise). Sorted by name; `q` filters on the name (EN or AR) or postal code. Text comes back in the caller’s language: `Accept-Language: ar|en`, then the signed-in account’s `language`, then `en`. The `*En` / `*Ar` fields are always present too, for screens that show both.
+         */
+        get: operations["AppCatalogController_communes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search services
+         * @description Public (a token adds `isFavourite` and enables `favourite=true`). The Search tab and screen 11a Filters. Only services visible in the app: published, provider active **and** verified, and at least one open wilaya. Anything else answers 404 rather than admitting it exists. `eventDate` keeps only providers with a free slot that day — no manual block and capacity left after held and booked events. Sort with `order`, not `sort`. Text comes back in the caller’s language: `Accept-Language: ar|en`, then the signed-in account’s `language`, then `en`. The `*En` / `*Ar` fields are always present too, for screens that show both.
+         */
+        get: operations["AppCatalogController_services"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/services/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Service detail
+         * @description Public (a token fills `isFavourite`). Screen 12 Service detail: the photo carousel, key facts, description, "good to know", extras, covered wilayas, the provider strip with its reply time and verified badge, the rating breakdown, the three most recent reviews and the provider’s other packs. Only services visible in the app: published, provider active **and** verified, and at least one open wilaya. Anything else answers 404 rather than admitting it exists. Text comes back in the caller’s language: `Accept-Language: ar|en`, then the signed-in account’s `language`, then `en`. The `*En` / `*Ar` fields are always present too, for screens that show both. The provider’s phone and email are never included — the client messages them through the chat.
+         */
+        get: operations["AppCatalogController_service"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/services/{id}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A month of availability
+         * @description Public. The calendar on screen 12. Every day of the month as `available`, `busy` (the provider already has as many events that day as the service allows) or `blocked` (the provider blocked it, or it is before `firstBookableDate`, which honours `booking_min_notice_days`). Ask one month at a time.
+         */
+        get: operations["AppCatalogController_serviceAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/services/{id}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reviews of a service
+         * @description Public. Screen 12 "See all 32". Published reviews only — a hidden one never appears, and a redacted one comes back with the admin’s cleaned text. Each row carries the provider’s published reply when there is one. Author names are shortened to "Yasmine K.".
+         */
+        get: operations["AppCatalogController_serviceReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/providers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Provider profile
+         * @description Public. Screen 13 Provider profile: the verified badge, the stats row (rating, reviews, events done, years), "What we checked", the bio, up to 10 visible services, their packs, the rating breakdown and recent reviews. Only active, verified providers; anything else is 404 `PROVIDER_NOT_FOUND`. Text comes back in the caller’s language: `Accept-Language: ar|en`, then the signed-in account’s `language`, then `en`. The `*En` / `*Ar` fields are always present too, for screens that show both. No phone, no email.
+         */
+        get: operations["AppCatalogController_provider"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/providers/{id}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reviews of a provider
+         * @description Public. Screen 13 "See all 32". Same rules as the service reviews.
+         */
+        get: operations["AppCatalogController_providerReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ready Packs
+         * @description Public (a token fills `isFavourite`). Screen 19 Ready Packs. Each card carries the saving against booking the services separately — the default order puts the biggest saving first — the item count, the category names and the provider who put the pack together. A pack flagged `needs_attention` (an item was unpublished or its provider blocked) is never listed.
+         */
+        get: operations["AppCatalogController_packs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/packs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pack detail
+         * @description Public. Screen 20 Pack detail: photos, "what is inside" line by line with each service’s own price, the pack price against `sumOfItems` with the saving, the wilayas **every** item covers, and recent reviews. Call `/app/packs/:id/availability` for the calendar.
+         */
+        get: operations["AppCatalogController_pack"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/packs/{id}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A month of availability for a whole pack
+         * @description Public. The calendar on screen 20, "Only days when all providers are free": the intersection across every item’s provider, so one taken provider makes the day `busy`. `maxEventsPerDay` is the smallest among the items.
+         */
+        get: operations["AppCatalogController_packAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report a browsing event (accepted, not stored yet)
+         * @description **Stub — nothing is persisted in V1.** The offer places the event-driven analytics widgets (views, searches, funnel, heat map) in V2 (api-decisions §3 and the scope check), so this route validates the payload and answers 202 without writing a row. It exists now so the app can ship the calls and start sending them from day one; when the `events` table lands, the same requests begin to count. **Do not** use it for anything the UI depends on — it returns no body.
+         */
+        post: operations["AppCatalogController_track"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public app configuration
+         * @description Public (no token). Screen 01 Splash calls it on every cold start. Compare `minAppVersion` with the installed build and show the store prompt when it is lower; when `maintenanceMode` is true, show `maintenanceMessage` and stop. Also carries the upload limits, the business `limits` object (budget lines, photos, evidence, message length, document types as MIME **and** extensions, the event-request form slug), the password rule the register screens print, and the legal links the "By continuing you agree…" line points at. Cacheable for 60 s.
+         */
+        get: operations["AppConfigController_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Price a booking before sending it
+         * @description The booking request sheet opened from screen 12 Service detail and screen 20 Pack detail. Returns the very lines `POST /app/bookings` would create, the totals and whether that date can be booked — **it writes nothing**. `feePercent` is Eventor’s cut for its own accounting; payment is cash between client and provider, so the client owes `total` and nothing else. An unavailable date is not an error here: `available` is `false` and `unavailableReason` says why, so the sheet can grey the button instead of showing a toast.
+         */
+        post: operations["AppBookingsController_quote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My bookings
+         * @description The client **Bookings** tab. One tab per call: `upcoming` (accepted, event still ahead), `pending` (waiting for the provider), `past` (completed, or accepted with the event behind us) and `cancelled` (cancelled **and** declined). Each card carries `allowedActions`, so the row’s buttons and the write endpoints can never disagree.
+         */
+        get: operations["AppBookingsController_list"];
+        put?: never;
+        /**
+         * Send a booking request
+         * @description The booking request flow (screen map §C "Booking request"). Creates one **pending** booking (status-rules §5): the reference `EVT-…`, the priced lines, the fee snapshot, a hold on the provider’s date and the direct conversation the two of you then talk in. The provider is notified. Send `X-Platform` so the booking records which app it came from.
+         */
+        post: operations["AppBookingsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Booking detail
+         * @description The booking detail behind the Bookings tab: the priced lines, the timeline of everything that happened, the provider card, the invoice summary once the booking is accepted, the dispute summary, the id of the chat and the `allowedActions`. The provider’s phone appears only once the booking is accepted, and their email never does (mobile-api §7). Only the client who made the booking can read or change it: somebody else’s booking answers **403 `NOT_OWNER`**, and an unknown id **404 `BOOKING_NOT_FOUND`**.
+         */
+        get: operations["AppBookingsController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel my booking
+         * @description status-rules §5: a client cancels a `pending` or an `accepted` booking. **No fee and no window are enforced** — payment is cash, the service’s own policy text (`cancellationPolicy` on the detail) is shown but not applied, and a disagreement becomes a dispute. The date is released and any invoice is voided.
+         */
+        post: operations["AppBookingsController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}/reschedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose another date
+         * @description status-rules §5 "Reschedule": either party proposes, the other accepts. On a **pending** booking the change is applied straight away; on an **accepted** one it becomes a proposal the provider answers with `/reschedules/{rid}/accept|reject`. Only one proposal can be open at a time.
+         */
+        post: operations["AppBookingsController_reschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}/reschedules/{rid}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept the provider’s new date
+         * @description Moves the booking and its availability hold to the proposed date. You cannot answer a proposal you made yourself (403 `NOT_OWNER`); cancel it instead.
+         */
+        post: operations["AppBookingsController_acceptReschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}/reschedules/{rid}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refuse the provider’s new date
+         * @description Closes the proposal; the booking keeps its original date.
+         */
+        post: operations["AppBookingsController_rejectReschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}/reschedules/{rid}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw my own reschedule proposal
+         * @description Only the **proposer** can withdraw, and only while the proposal is still pending (409 `RESCHEDULE_NOT_PENDING` otherwise). Withdrawing somebody else’s proposal is 403 `NOT_OWNER` — answer it with `/accept` or `/reject` instead. The booking keeps its current date.
+         */
+        post: operations["AppBookingsController_withdrawReschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}/check-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * All good / Report a problem
+         * @description status-rules §5, after the event: `{"answer":"ok"}` is **All good**. When both the client and the provider have tapped it the booking completes immediately instead of waiting out the 72-hour dispute window. `{"answer":"problem"}` deliberately answers **422 `CHECK_IN_NOT_ALLOWED`** with `details.next` pointing at `POST /app/bookings/{id}/disputes` — reporting a problem is opening a dispute, and it needs a description.
+         */
+        post: operations["AppBookingsController_checkIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}/invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The invoice of my booking
+         * @description Eventor issues an invoice document when a booking is accepted (status-rules §5). Only the booking’s own client can read it.
+         */
+        get: operations["AppBookingsController_invoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}/invoice.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The invoice as a PDF
+         * @description The same invoice as a downloadable PDF, for the share sheet. Only the booking’s own client can read it.
+         */
+        get: operations["AppBookingsController_invoicePdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everything the provider home needs, in one call
+         * @description Screens **21 Home · Provider** and **21a Home · Provider · Pending**. `state` decides which one to draw: `verified` gives the full home (counts, booking requests with Accept / Decline, the next accepted bookings, your services with their availability and the "Available for bookings" toggle); `pending` and `rejected` give 21a, with `verificationSteps` and the same `documents` payload as `GET /app/me/documents` so the screen can offer a resubmit without a second call.
+         */
+        get: operations["AppProviderController_home"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit my provider profile
+         * @description The Profile tab and the **"Available for bookings"** toggle on screen 21. Turning `acceptingBookings` off keeps the services visible and refuses new bookings (status-rules §3). `wilayaCodes` replaces the set and every added wilaya must be open. The account’s own name, phone, language and avatar live on `PATCH /app/me`. **Deliberately answers with the whole account (`AppMeDto`)**, provider profile included, so one round trip refreshes everything the Profile tab shows — this differs from the other provider routes on purpose.
+         */
+        patch: operations["AppProviderController_updateProfile"];
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My booking requests and bookings
+         * @description The provider **Requests** tab. `requests` is everything still pending, `upcoming` the accepted bookings from today on, `past` the completed ones and the accepted ones whose event has gone by. The client’s phone and email appear only once you have accepted (status-rules §10).
+         */
+        get: operations["AppProviderController_listBookings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Booking detail
+         * @description The request detail behind screen 21. Yours only: another provider’s row answers **403 `NOT_OWNER`**, an unknown id **404**.
+         */
+        get: operations["AppProviderController_booking"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept a booking request
+         * @description The **Accept** button on screen 21 (status-rules §5). The date is re-checked under a row lock, the hold becomes a booking, Eventor issues the invoice and contact details become visible in the chat. Only a **verified and active** provider can accept (422 `PROVIDER_NOT_VERIFIED`).
+         */
+        post: operations["AppProviderController_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline a booking request
+         * @description The **Decline** button on screen 21. The held date is released and the client is told why.
+         */
+        post: operations["AppProviderController_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an accepted booking
+         * @description status-rules §5: no fee and no window are enforced (cash). The date is released and the invoice voided.
+         */
+        post: operations["AppProviderController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark the event as done
+         * @description status-rules §5: an accepted booking whose event date has passed becomes `completed`. The client is invited to review it after `review_open_after_hours`. A job does this automatically 72 h after the event when nobody does.
+         */
+        post: operations["AppProviderController_complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/reschedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose another date
+         * @description status-rules §5. A pending booking moves straight away; an accepted one waits for the client’s answer.
+         */
+        post: operations["AppProviderController_reschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/reschedules/{rid}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept the client’s new date
+         * @description Moves the booking and its hold. You cannot answer your own proposal (403 `NOT_OWNER`).
+         */
+        post: operations["AppProviderController_acceptReschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/reschedules/{rid}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refuse the client’s new date
+         * @description Closes the proposal; the booking keeps its date.
+         */
+        post: operations["AppProviderController_rejectReschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/reschedules/{rid}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw my own reschedule proposal
+         * @description Only the **proposer** can withdraw, and only while the proposal is pending (409 `RESCHEDULE_NOT_PENDING` otherwise). The client’s proposal is answered with `/accept` or `/reject`, never withdrawn (403 `NOT_OWNER`).
+         */
+        post: operations["AppProviderController_withdrawReschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The invoice of my booking
+         * @description The provider side of the invoice Eventor issues when a booking is accepted (status-rules §5). Readable only on **accepted or completed** bookings of yours — anything else answers 404 `INVOICE_NOT_FOUND`.
+         */
+        get: operations["AppProviderController_invoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/invoice.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The invoice as a PDF
+         * @description The same invoice as a downloadable PDF, for the share sheet. Accepted or completed bookings of yours only.
+         */
+        get: operations["AppProviderController_invoicePdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/bookings/{id}/check-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * All good / Report a problem
+         * @description The provider half of status-rules §5: `{"answer":"ok"}` confirms the event went well, and when the client has confirmed too the booking completes immediately. `{"answer":"problem"}` answers 422 with `details.next` pointing at `POST /app/bookings/{id}/disputes`.
+         */
+        post: operations["AppProviderController_checkIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My services
+         * @description The Services tab and the "Your services" block on screen 21. Drafts, published and hidden services, with `visibleInApp` saying whether clients can find each one today.
+         */
+        get: operations["AppProviderController_listServices"];
+        put?: never;
+        /**
+         * Create a service
+         * @description Add a service (Services · Add a service). It starts as a **draft**: publish it with `/publish` once the checklist in status-rules §3 is met (EN + AR title and description, a base price, at least one photo, a visible category and at least one **open** wilaya). The owner is always you.
+         */
+        post: operations["AppProviderController_createService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/services/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One of my services
+         * @description The editing screen’s source of truth: the same `ServiceDetailDto` the PATCH and publish routes answer with, so an edit form never has to work from a list row. Yours only: another provider’s row answers **403 `NOT_OWNER`**, an unknown id **404**.
+         */
+        get: operations["AppProviderController_getService"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a service
+         * @description Soft delete. Refused with 409 `SERVICE_HAS_BOOKINGS` while an accepted booking is still ahead; pending bookings on it are cancelled (status-rules §3).
+         */
+        delete: operations["AppProviderController_deleteService"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a service
+         * @description Partial update of one of your services; `wilayaCodes` and `extras` replace their set. Yours only: another provider’s row answers **403 `NOT_OWNER`**, an unknown id **404**.
+         */
+        patch: operations["AppProviderController_updateService"];
+        trace?: never;
+    };
+    "/api/v1/app/provider/services/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish a service
+         * @description status-rules §3 `draft → published`. Refuses with 422 `SERVICE_PUBLISH_INVALID` and `details.missing` listing what the form still needs, and with 422 `PROVIDER_NOT_VERIFIED` while your profile is under review.
+         */
+        post: operations["AppProviderController_publishService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/services/{id}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unpublish a service
+         * @description status-rules §3 `published → draft`: out of search and of your profile. Packs containing it are recomputed.
+         */
+        post: operations["AppProviderController_unpublishService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/services/{id}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a photo to a service
+         * @description The type is sniffed from the bytes. The image becomes WebP with `thumb` and `medium` variants through a background job, so the variants may lag a second behind. The limit is `max_photos_per_service` (422 `PHOTO_LIMIT_REACHED`). Returns the whole gallery in order.
+         */
+        post: operations["AppProviderController_addServicePhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/services/{id}/photos/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Reorder a service’s photos
+         * @description Send every photo id in the new order; the first one is the cover.
+         */
+        patch: operations["AppProviderController_orderServicePhotos"];
+        trace?: never;
+    };
+    "/api/v1/app/provider/services/{id}/photos/{photoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a photo
+         * @description Refused with 422 `SERVICE_PUBLISH_INVALID` when it is the last photo of a published service — unpublish it first.
+         */
+        delete: operations["AppProviderController_deleteServicePhoto"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Ready Packs
+         * @description The "My packs" tab. `needsAttention` marks a pack whose items are no longer all published (status-rules §4).
+         */
+        get: operations["AppProviderController_listPacks"];
+        put?: never;
+        /**
+         * Create a Ready Pack
+         * @description status-rules §4: a pack is built from **your own** services (at least 2), in one wilaya, at a price below the sum of the items. It starts as a draft.
+         */
+        post: operations["AppProviderController_createPack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/packs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One of my packs
+         * @description The pack editing screen’s source of truth: the same `PackDetailDto` the PATCH and publish routes answer with, including `attentionReasons` and the `publishMissing` checklist. Yours only: another provider’s row answers **403 `NOT_OWNER`**, an unknown id **404**.
+         */
+        get: operations["AppProviderController_getPack"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a pack
+         * @description Soft delete; refused with 409 `PACK_HAS_BOOKINGS` while a booking on it is still live.
+         */
+        delete: operations["AppProviderController_deletePack"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a pack
+         * @description `serviceIds` replaces the items, in order. Yours only: another provider’s row answers **403 `NOT_OWNER`**, an unknown id **404**.
+         */
+        patch: operations["AppProviderController_updatePack"];
+        trace?: never;
+    };
+    "/api/v1/app/provider/packs/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish a pack
+         * @description status-rules §4. 422 `PACK_PUBLISH_INVALID` lists what is missing; 422 `PROVIDER_NOT_VERIFIED` while your profile is under review.
+         */
+        post: operations["AppProviderController_publishPack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/packs/{id}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unpublish a pack
+         * @description status-rules §4 `published → unpublished`.
+         */
+        post: operations["AppProviderController_unpublishPack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/packs/{id}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a photo to a pack
+         * @description Same pipeline and limits as a service photo; the limit is `max_photos_per_pack`.
+         */
+        post: operations["AppProviderController_addPackPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/packs/{id}/photos/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Reorder a pack’s photos
+         * @description Send every photo id in the new order.
+         */
+        patch: operations["AppProviderController_orderPackPhotos"];
+        trace?: never;
+    };
+    "/api/v1/app/provider/packs/{id}/photos/{photoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a pack photo
+         * @description Removes one photo from the pack gallery.
+         */
+        delete: operations["AppProviderController_deletePackPhoto"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My calendar, one month at a time
+         * @description The Calendar tab. Every day of the month with what is on it: `booked` (an accepted booking), `held` (a pending request), `blocked` (a block you added for the whole day), `partial` or `free`. `maxEventsPerDay` is the highest capacity among your services.
+         */
+        get: operations["AppProviderController_availability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/availability/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Block a day (or part of one)
+         * @description Marks a day as unavailable so clients cannot book it. Omit the times to block the whole day, or send `startTime` **and** `endTime` for a slot. `serviceId` narrows the block to one of your services. Past dates are refused (422 `AVAILABILITY_DATE_PAST`).
+         */
+        post: operations["AppProviderController_block"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/availability/blocks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unblock a day
+         * @description Only a block **you** added: a booked or held day is not removable (409 `AVAILABILITY_BLOCK_NOT_REMOVABLE`).
+         */
+        delete: operations["AppProviderController_unblock"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/provider/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reviews I received
+         * @description Profile · Reviews. Authors appear as "Yasmine K." (mobile-api §7) and reviews an admin hid are left out. `replyEditable` says whether your reply is still inside its 48-hour window.
+         */
+        get: operations["AppProviderController_reviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My conversations
+         * @description Screen 14 Messages: the avatar, the name, the last message, the time and the unread badge. The **All / Unread** chips are `filter=all|unread`; `filter=booking` keeps the chats attached to a booking. `q` searches the other person's name. `userId` returns only the **direct** chat with that user (empty list when there is none) — the "Message" button uses it instead of matching names. Live updates come from the Socket.IO namespace **`/app`** (`message:new`, `conversation:updated`), authenticated with the same access token. Polling is a fallback, not the design.
+         */
+        get: operations["AppMessagesController_list"];
+        put?: never;
+        /**
+         * Start (or continue) a chat
+         * @description The "Message" button on screen 12 Service detail. A client writes to a provider and the other way round — there is exactly **one direct conversation per pair** (status-rules §10), so calling this again just adds a message to the existing one. `bookingId` attaches the context card, and must be a booking the two of you share.
+         */
+        post: operations["AppMessagesController_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/conversations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conversation header
+         * @description The header of screen 15 Chat: who you are talking to, the booking context card, whether you can still write and `contactUnmasked`. A conversation you are not part of answers **403 `NOT_A_PARTICIPANT`**.
+         */
+        get: operations["AppMessagesController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/conversations/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The messages of a chat
+         * @description Screen 15’s bubbles, **oldest first** so the list appends at the bottom. Scroll up by sending the previous page’s `meta.nextBefore` as `before`; `meta.hasMore` says when to stop. A message an admin hid comes back as `[removed by Eventor]`, and deleted ones are simply absent.
+         */
+        get: operations["AppMessagesController_messagesPage"];
+        put?: never;
+        /**
+         * Send a message
+         * @description JSON `{ "body": "…" }` for text, or `multipart/form-data` with `file` for an image (and an optional `body` caption). The type is sniffed from the bytes. Contact details in the text are masked for the other party until you share an accepted booking. A chat an admin closed answers **409 `CONVERSATION_CLOSED`** (a state conflict, api-standards §5). Works in every conversation you are in — direct, support and **dispute** chats alike.
+         */
+        post: operations["AppMessagesController_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/conversations/support": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Contact Eventor support
+         * @description The "Contact support" action. One **support** conversation per user (status-rules §10): the first call creates it and sends your message, later calls add to the same thread. Eventor support appears among the participants once an admin answers. Returns the conversation detail, ready to open as screen 15.
+         */
+        post: operations["AppMessagesController_startSupport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/conversations/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a chat as read
+         * @description Clears the unread badge on screen 14 and stops the push for it. Call it when screen 15 opens and on each new message you display.
+         */
+        post: operations["AppMessagesController_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/messages/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report a message
+         * @description Screen 15 long-press. Opens a report an admin then handles (status-rules §9). One open report per reporter and target: reporting twice answers 201 with `created: false` rather than an error.
+         */
+        post: operations["AppMessagesController_reportMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report a service, pack, user or review
+         * @description The "Report" action on screens 12, 13 and 15 (status-rules §9). An admin resolves it, and acting on the target closes every open report on it. One open report per reporter and target.
+         */
+        post: operations["AppMessagesController_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review a completed booking
+         * @description The "Leave a review" screen, usually opened from the notification. status-rules §8: **the client** of a **completed** booking, one review per booking, from `review_open_after_hours` (24 h) after the completion until 60 days after it, and never while a dispute is open. The comment is scanned for phone numbers, emails, links and insults: a flagged review is **still published** and opens an automatic report for an admin to look at.
+         */
+        post: operations["AppReviewsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/reviews/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit my review
+         * @description status-rules §8: the author edits their review for **48 hours** after writing it; after that it answers 422 `REVIEW_EDIT_WINDOW_CLOSED`. Ratings are recomputed.
+         */
+        patch: operations["AppReviewsController_edit"];
+        trace?: never;
+    };
+    "/api/v1/app/me/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reviews I wrote
+         * @description Profile · My reviews. A review an admin hid or redacted keeps its row and says so in `status`, so the client is never left wondering where it went.
+         */
+        get: operations["AppReviewsController_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/reviews/{id}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reply to a review
+         * @description status-rules §8: **one** public reply per review, by the provider it is about. The text goes through the same flag scan as a review. Editable and deletable for 48 h.
+         */
+        post: operations["AppReviewsController_reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/reviews/replies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete my reply
+         * @description Within the same 48-hour window. The review itself is untouched.
+         */
+        delete: operations["AppReviewsController_deleteReply"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit my reply
+         * @description Within 48 h of writing it (status-rules §8), otherwise 422 `REVIEW_EDIT_WINDOW_CLOSED`.
+         */
+        patch: operations["AppReviewsController_editReply"];
+        trace?: never;
+    };
+    "/api/v1/app/bookings/{id}/disputes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report a problem on a booking
+         * @description status-rules §6, for **either** party. The window runs from the event start until `dispute_window_hours` (72 h) after the event end, or 7 days after a contested cancellation — outside it, 422 `DISPUTE_WINDOW_CLOSED`. Opening one pauses the automatic completion and the reviews, attaches a snapshot of your chat as evidence, and opens a dispute conversation with the other party and Eventor. Only one open dispute per booking. Payment is cash, so a dispute is a way to hand the problem to an admin — there are no refunds and no fees.
+         */
+        post: operations["AppReviewsController_openDispute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/disputes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My disputes
+         * @description Every dispute on a booking of yours, whichever side opened it, newest first.
+         */
+        get: operations["AppReviewsController_listDisputes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/disputes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dispute detail
+         * @description The dispute screen: the description, the evidence (private to the two parties and Eventor), the id of the dispute chat and, once an admin has decided, the decision note. A dispute on somebody else’s booking answers 403 `NOT_OWNER`.
+         */
+        get: operations["AppReviewsController_dispute"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/disputes/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write in the dispute chat (text convenience)
+         * @description The dispute conversation holds you, the other party and Eventor support. This route is a **text-only convenience**: the normal `POST /app/conversations/{conversationId}/messages` route works in the dispute chat too while it is open — including multipart images — using the `conversationId` from the dispute detail. Messages are never masked here — an admin is reading. A closed dispute chat answers **409 `CONVERSATION_CLOSED`**.
+         */
+        post: operations["AppReviewsController_disputeMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/disputes/{id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add evidence
+         * @description One file at a time, at most `max_dispute_evidence_files` per party (422 `DISPUTE_EVIDENCE_LIMIT`) and 5 MB each (413 `FILE_TOO_LARGE`). Evidence is private to the two parties and Eventor. Only while the dispute is open or in review.
+         */
+        post: operations["AppReviewsController_addEvidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/disputes/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw my dispute
+         * @description status-rules §6: the person who opened a dispute can close it while it is still open or in review — the booking then continues normally and the other party is told. Anyone else, or a dispute already decided, gets 409 `DISPUTE_NOT_WITHDRAWABLE`.
+         */
+        post: operations["AppReviewsController_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3038,7 +5326,7 @@ export interface components {
              * @example CATEGORY_HAS_SERVICES
              * @enum {string}
              */
-            code: "VALIDATION_FAILED" | "BAD_REQUEST" | "SORT_FIELD_NOT_ALLOWED" | "NOT_FOUND" | "ROUTE_NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "STALE_UPDATE" | "UNPROCESSABLE" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "AUTH_TOKEN_MISSING" | "AUTH_TOKEN_INVALID" | "AUTH_TOKEN_EXPIRED" | "FORBIDDEN" | "FORBIDDEN_ROLE" | "NOT_OWNER" | "ACCOUNT_BLOCKED" | "AUTH_SESSION_REVOKED" | "AUTH_REFRESH_INVALID" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "PASSWORD_WEAK" | "RESET_TOKEN_INVALID" | "RESET_TOKEN_EXPIRED" | "INVITATION_INVALID" | "INVITATION_EXPIRED" | "INVITATION_NOT_FOUND" | "INVITATION_EXISTS" | "EMAIL_TAKEN" | "CURRENT_PASSWORD_INVALID" | "SESSION_NOT_FOUND" | "ADMIN_NOT_FOUND" | "CANNOT_REMOVE_SELF" | "LAST_ADMIN" | "SETTING_UNKNOWN" | "SETTINGS_CONFIRM_REQUIRED" | "AUDIT_LOG_NOT_FOUND" | "EXPORT_NOT_FOUND" | "SAVED_VIEW_NOT_FOUND" | "SAVED_VIEW_NAME_TAKEN" | "CATEGORY_NOT_FOUND" | "SLUG_TAKEN" | "CATEGORY_HAS_SERVICES" | "CATEGORY_MOVE_TARGET_INVALID" | "WILAYA_NOT_FOUND" | "WILAYA_CLOSE_CONFIRM_REQUIRED" | "COMMUNE_NOT_FOUND" | "COMMUNE_EXISTS" | "COMMUNE_IN_USE" | "CSV_HEADER_INVALID" | "CSV_TOO_MANY_ROWS" | "USER_NOT_FOUND" | "PHONE_TAKEN" | "ROLE_IMMUTABLE" | "NOT_A_PROVIDER" | "USER_ALREADY_BLOCKED" | "USER_NOT_BLOCKED" | "ACCOUNT_HAS_ACTIVE_ITEMS" | "TYPED_NAME_MISMATCH" | "BULK_ACTION_REFUSED" | "NOTE_NOT_FOUND" | "DOCUMENT_NOT_FOUND" | "DOCUMENT_INVALID_TRANSITION" | "FILE_NOT_FOUND" | "FILE_URL_INVALID" | "FILE_URL_EXPIRED" | "FILE_TOO_LARGE" | "FILE_TYPE_NOT_ALLOWED" | "FILE_NOT_READY" | "SERVICE_NOT_FOUND" | "CATEGORY_HIDDEN" | "WILAYA_CLOSED" | "SERVICE_PUBLISH_INVALID" | "SERVICE_INVALID_TRANSITION" | "FEATURED_LIMIT" | "SERVICE_HAS_BOOKINGS" | "SERVICE_IN_PACKS" | "PHOTO_LIMIT_REACHED" | "PHOTO_NOT_FOUND" | "PHOTO_ORDER_INVALID" | "AVAILABILITY_BLOCK_NOT_FOUND" | "AVAILABILITY_BLOCK_NOT_REMOVABLE" | "AVAILABILITY_DATE_PAST" | "AVAILABILITY_SERVICE_INVALID" | "PACK_NOT_FOUND" | "PACK_SERVICE_NOT_FOUND" | "PACK_SERVICE_OTHER_PROVIDER" | "PACK_PUBLISH_INVALID" | "PACK_INVALID_TRANSITION" | "PACK_HAS_BOOKINGS" | "BOOKING_NOT_FOUND" | "BOOKING_INVALID_TRANSITION" | "BOOKING_NOT_EDITABLE" | "DATE_UNAVAILABLE" | "SERVICE_UNAVAILABLE_FOR_BOOKING" | "PACK_UNAVAILABLE" | "PROVIDER_NOT_ACCEPTING" | "MIN_NOTICE" | "BOOKING_DATE_PAST" | "NOT_A_CLIENT" | "BOOKING_EXTRA_INVALID" | "BOOKING_TOTAL_NEGATIVE" | "COMMUNE_WILAYA_MISMATCH" | "ACADEMIC_REQUEST_NOT_FOUND" | "USE_RESCHEDULE" | "RESCHEDULE_NOT_FOUND" | "RESCHEDULE_NOT_PENDING" | "RESCHEDULE_PENDING_EXISTS" | "REMINDER_TOO_SOON" | "INVOICE_NOT_FOUND" | "CONVERSATION_NOT_FOUND" | "MESSAGE_NOT_FOUND" | "MESSAGE_INVALID_TRANSITION" | "CONVERSATION_CLOSED" | "CONVERSATION_NOT_CLOSED" | "CONVERSATION_ALREADY_CLOSED" | "PARTICIPANT_NOT_FOUND" | "RECIPIENT_INVALID" | "DISPUTE_NOT_FOUND" | "DISPUTE_ALREADY_OPEN" | "BOOKING_NOT_DISPUTABLE" | "DISPUTE_WINDOW_CLOSED" | "DISPUTE_INVALID_TRANSITION" | "DISPUTE_PARTY_INVALID" | "DISPUTE_EVIDENCE_LIMIT" | "EVIDENCE_FILE_INVALID" | "FORM_NOT_FOUND" | "FORM_CLOSED" | "FORM_VERSION_NOT_FOUND" | "FORM_SCHEMA_INVALID" | "FORM_TRANSLATION_MISSING" | "FORM_INVALID_TRANSITION" | "FORM_HAS_SUBMISSIONS" | "FORM_DEFAULT_REQUIRED" | "FORM_ANSWERS_INVALID" | "FORM_SUBMISSION_LIMIT" | "FORM_REQUIRES_ACCOUNT" | "CODE_INVALID" | "CODE_EXPIRED" | "CODE_RESEND_TOO_SOON" | "UPLOAD_TOKEN_INVALID" | "EDIT_LINK_INVALID" | "ACADEMIC_REQUEST_INVALID_TRANSITION" | "ACADEMIC_REQUEST_FIELDS_INVALID" | "PROPOSAL_NOT_FOUND" | "PROPOSAL_EXISTS" | "PROPOSAL_BOOKED" | "REQUESTER_NOT_CLIENT" | "REVIEW_NOT_FOUND" | "REVIEW_INVALID_TRANSITION" | "REVIEW_NO_OPEN_REPORTS" | "REVIEW_REPLY_NOT_FOUND" | "REVIEW_REPLY_INVALID_TRANSITION" | "REPORT_NOT_FOUND" | "REPORT_INVALID_TRANSITION" | "REPORT_NOT_CONVERTIBLE" | "MESSAGE_NO_OPEN_REPORTS" | "OVERVIEW_RANGE_INVALID";
+            code: "VALIDATION_FAILED" | "BAD_REQUEST" | "SORT_FIELD_NOT_ALLOWED" | "NOT_FOUND" | "ROUTE_NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "STALE_UPDATE" | "UNPROCESSABLE" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "AUTH_TOKEN_MISSING" | "AUTH_TOKEN_INVALID" | "AUTH_TOKEN_EXPIRED" | "FORBIDDEN" | "FORBIDDEN_ROLE" | "NOT_OWNER" | "ACCOUNT_BLOCKED" | "AUTH_SESSION_REVOKED" | "AUTH_SESSION_REPLACED" | "AUTH_REFRESH_INVALID" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "PASSWORD_WEAK" | "RESET_TOKEN_INVALID" | "RESET_TOKEN_EXPIRED" | "INVITATION_INVALID" | "INVITATION_EXPIRED" | "INVITATION_NOT_FOUND" | "INVITATION_EXISTS" | "EMAIL_TAKEN" | "CURRENT_PASSWORD_INVALID" | "SESSION_NOT_FOUND" | "ADMIN_NOT_FOUND" | "CANNOT_REMOVE_SELF" | "LAST_ADMIN" | "SETTING_UNKNOWN" | "SETTINGS_CONFIRM_REQUIRED" | "AUDIT_LOG_NOT_FOUND" | "EXPORT_NOT_FOUND" | "SAVED_VIEW_NOT_FOUND" | "SAVED_VIEW_NAME_TAKEN" | "CATEGORY_NOT_FOUND" | "SLUG_TAKEN" | "CATEGORY_HAS_SERVICES" | "CATEGORY_MOVE_TARGET_INVALID" | "WILAYA_NOT_FOUND" | "WILAYA_CLOSE_CONFIRM_REQUIRED" | "COMMUNE_NOT_FOUND" | "COMMUNE_EXISTS" | "COMMUNE_IN_USE" | "CSV_HEADER_INVALID" | "CSV_TOO_MANY_ROWS" | "USER_NOT_FOUND" | "PHONE_TAKEN" | "ROLE_IMMUTABLE" | "NOT_A_PROVIDER" | "USER_ALREADY_BLOCKED" | "USER_NOT_BLOCKED" | "ACCOUNT_HAS_ACTIVE_ITEMS" | "TYPED_NAME_MISMATCH" | "BULK_ACTION_REFUSED" | "NOTE_NOT_FOUND" | "DOCUMENT_NOT_FOUND" | "DOCUMENT_INVALID_TRANSITION" | "FILE_NOT_FOUND" | "FILE_URL_INVALID" | "FILE_URL_EXPIRED" | "FILE_TOO_LARGE" | "FILE_TYPE_NOT_ALLOWED" | "FILE_NOT_READY" | "SERVICE_NOT_FOUND" | "CATEGORY_HIDDEN" | "WILAYA_CLOSED" | "SERVICE_PUBLISH_INVALID" | "SERVICE_INVALID_TRANSITION" | "FEATURED_LIMIT" | "SERVICE_HAS_BOOKINGS" | "SERVICE_IN_PACKS" | "PHOTO_LIMIT_REACHED" | "PHOTO_NOT_FOUND" | "PHOTO_ORDER_INVALID" | "AVAILABILITY_BLOCK_NOT_FOUND" | "AVAILABILITY_BLOCK_NOT_REMOVABLE" | "AVAILABILITY_DATE_PAST" | "AVAILABILITY_SERVICE_INVALID" | "PACK_NOT_FOUND" | "PACK_SERVICE_NOT_FOUND" | "PACK_SERVICE_OTHER_PROVIDER" | "PACK_PUBLISH_INVALID" | "PACK_WILAYA_NOT_COVERED" | "PACK_INVALID_TRANSITION" | "PACK_HAS_BOOKINGS" | "BOOKING_NOT_FOUND" | "BOOKING_INVALID_TRANSITION" | "BOOKING_NOT_EDITABLE" | "DATE_UNAVAILABLE" | "SERVICE_TIMES_REQUIRED" | "OUTSIDE_SERVICE_HOURS" | "OUTSIDE_SERVICE_PERIOD" | "SLOT_UNAVAILABLE" | "BOOKING_DUPLICATE" | "SERVICE_UNAVAILABLE_FOR_BOOKING" | "PACK_UNAVAILABLE" | "PROVIDER_NOT_ACCEPTING" | "MIN_NOTICE" | "BOOKING_DATE_PAST" | "NOT_A_CLIENT" | "BOOKING_EXTRA_INVALID" | "BOOKING_TOTAL_NEGATIVE" | "COMMUNE_WILAYA_MISMATCH" | "ACADEMIC_REQUEST_NOT_FOUND" | "USE_RESCHEDULE" | "RESCHEDULE_NOT_FOUND" | "RESCHEDULE_NOT_PENDING" | "RESCHEDULE_PENDING_EXISTS" | "REMINDER_TOO_SOON" | "INVOICE_NOT_FOUND" | "CONVERSATION_NOT_FOUND" | "MESSAGE_NOT_FOUND" | "MESSAGE_INVALID_TRANSITION" | "CONVERSATION_CLOSED" | "CONVERSATION_NOT_CLOSED" | "CONVERSATION_ALREADY_CLOSED" | "PARTICIPANT_NOT_FOUND" | "RECIPIENT_INVALID" | "DISPUTE_NOT_FOUND" | "DISPUTE_ALREADY_OPEN" | "BOOKING_NOT_DISPUTABLE" | "DISPUTE_WINDOW_CLOSED" | "DISPUTE_INVALID_TRANSITION" | "DISPUTE_PARTY_INVALID" | "DISPUTE_EVIDENCE_LIMIT" | "EVIDENCE_FILE_INVALID" | "FORM_NOT_FOUND" | "FORM_CLOSED" | "FORM_VERSION_NOT_FOUND" | "FORM_SCHEMA_INVALID" | "FORM_TRANSLATION_MISSING" | "FORM_INVALID_TRANSITION" | "FORM_HAS_SUBMISSIONS" | "FORM_DEFAULT_REQUIRED" | "FORM_ANSWERS_INVALID" | "FORM_SUBMISSION_LIMIT" | "FORM_REQUIRES_ACCOUNT" | "CODE_INVALID" | "CODE_EXPIRED" | "CODE_RESEND_TOO_SOON" | "UPLOAD_TOKEN_INVALID" | "EDIT_LINK_INVALID" | "ACADEMIC_REQUEST_INVALID_TRANSITION" | "ACADEMIC_REQUEST_FIELDS_INVALID" | "PROPOSAL_NOT_FOUND" | "PROPOSAL_EXISTS" | "PROPOSAL_BOOKED" | "REQUESTER_NOT_CLIENT" | "REVIEW_NOT_FOUND" | "REVIEW_INVALID_TRANSITION" | "REVIEW_NO_OPEN_REPORTS" | "REVIEW_REPLY_NOT_FOUND" | "REVIEW_REPLY_INVALID_TRANSITION" | "REPORT_NOT_FOUND" | "REPORT_INVALID_TRANSITION" | "REPORT_NOT_CONVERTIBLE" | "MESSAGE_NO_OPEN_REPORTS" | "OVERVIEW_RANGE_INVALID" | "FORBIDDEN_AUDIENCE" | "EMAIL_NOT_VERIFIED" | "EMAIL_ALREADY_VERIFIED" | "PASSWORD_ALREADY_SET" | "ROLE_NOT_ALLOWED_IN_APP" | "PROVIDER_FIELDS_REQUIRED" | "PROVIDER_FIELDS_NOT_ALLOWED" | "PROVIDER_NOT_FOUND" | "FAVOURITE_NOT_FOUND" | "FAVOURITE_TARGET_INVALID" | "BUDGET_NOT_FOUND" | "BUDGET_ITEM_NOT_FOUND" | "BUDGET_ITEM_LIMIT" | "BUDGET_BOOKING_ALREADY_LINKED" | "NOTIFICATION_NOT_FOUND" | "DEVICE_TOKEN_NOT_FOUND" | "MONTH_INVALID" | "PROVIDER_NOT_VERIFIED" | "CHECK_IN_NOT_ALLOWED" | "CHECK_IN_TOO_EARLY" | "CHECK_IN_DISPUTED" | "REVIEW_EXISTS" | "REVIEW_NOT_ALLOWED" | "REVIEW_WINDOW_CLOSED" | "REVIEW_EDIT_WINDOW_CLOSED" | "REVIEW_REPLY_EXISTS" | "REPORT_TARGET_NOT_FOUND" | "NOT_A_PARTICIPANT" | "CONVERSATION_READ_ONLY" | "DISPUTE_NOT_WITHDRAWABLE" | "BOOKING_TAB_INVALID";
             /**
              * @description Translated with Accept-Language (en | ar).
              * @example This category still has 10 services.
@@ -3320,7 +5608,7 @@ export interface components {
         };
         Object: Record<string, never>;
         UnreadCountDto: {
-            /** @example 4 */
+            /** @example 3 */
             unread: number;
         };
         MarkReadResultDto: {
@@ -3333,13 +5621,10 @@ export interface components {
             unread: number;
         };
         MarkNotificationsReadDto: {
-            /** @description Notifications to mark as read (ids of other admins are ignored). Required unless `all: true`. */
+            /** @description The notifications to mark read. Ignored when `all` is true. */
             ids?: string[];
-            /**
-             * @description Mark every notification of the current admin as read.
-             * @enum {boolean}
-             */
-            all?: true;
+            /** @description Mark every notification of this account read ("Mark all read"). */
+            all?: boolean;
         };
         LiveResponseDto: {
             /** @example ok */
@@ -3355,6 +5640,12 @@ export interface components {
              * @enum {string}
              */
             queue: "bullmq" | "inline";
+            /**
+             * @description `smtp` when outgoing mail is configured; `console` means emails only reach the server log — codes and invoices are not delivered.
+             * @example smtp
+             * @enum {string}
+             */
+            mail: "smtp" | "console";
         };
         UpdateMeDto: {
             /** @example Sara Meziane */
@@ -4706,6 +6997,13 @@ export interface components {
              */
             bookings: "cancel" | "keep";
         };
+        RemoveAvatarDto: {
+            /**
+             * @description Kept in the activity log.
+             * @example Photo did not show the person.
+             */
+            note?: Record<string, never>;
+        };
         PasswordResetResultDto: {
             /** @enum {string} */
             mode: "link" | "temporary";
@@ -5792,6 +8090,12 @@ export interface components {
             /** @example قاعات الحفلات */
             nameAr: string;
         };
+        AttentionReasonDto: {
+            /** @enum {string} */
+            code: "item_not_published" | "item_deleted" | "provider_blocked" | "provider_not_verified" | "provider_deleted";
+            /** Format: uuid */
+            serviceId: string | null;
+        };
         PackRowDto: {
             /** Format: uuid */
             id: string;
@@ -5835,6 +8139,8 @@ export interface components {
             status: "draft" | "published" | "unpublished";
             /** @example false */
             needsAttention: boolean;
+            /** @description Why the pack needs attention (empty when healthy) — same values as the detail, so a list row can say which item to fix. */
+            attentionReasons: components["schemas"]["AttentionReasonDto"][];
             /** @example true */
             visibleInApp: boolean;
             /** Format: date-time */
@@ -5915,12 +8221,6 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
-        AttentionReasonDto: {
-            /** @enum {string} */
-            code: "item_not_published" | "item_deleted" | "provider_blocked" | "provider_not_verified" | "provider_deleted";
-            /** Format: uuid */
-            serviceId: string | null;
-        };
         PackDetailDto: {
             /** Format: uuid */
             id: string;
@@ -5964,6 +8264,8 @@ export interface components {
             status: "draft" | "published" | "unpublished";
             /** @example false */
             needsAttention: boolean;
+            /** @description Why the pack needs attention (empty when healthy) — same values as the detail, so a list row can say which item to fix. */
+            attentionReasons: components["schemas"]["AttentionReasonDto"][];
             /** @example true */
             visibleInApp: boolean;
             /** Format: date-time */
@@ -5976,10 +8278,8 @@ export interface components {
             maxGuests: number | null;
             items: components["schemas"]["PackItemDto"][];
             photos: components["schemas"]["PhotoDto"][];
-            /** @description Why the pack needs attention (empty when healthy). */
-            attentionReasons: components["schemas"]["AttentionReasonDto"][];
-            /** @description Publish checklist: what is still missing. */
-            publishMissing: ("nameEn" | "nameAr" | "items" | "unpublishedItems" | "providerBlocked" | "providerNotVerified" | "priceNotBelowSum")[];
+            /** @description Publish checklist: what is still missing (status-rules §4). `wilayaNotCovered` means the pack wilaya is not covered by every item — publishing then answers 422 `PACK_WILAYA_NOT_COVERED`. */
+            publishMissing: ("nameEn" | "nameAr" | "items" | "unpublishedItems" | "providerBlocked" | "providerNotVerified" | "priceNotBelowSum" | "wilayaNotCovered")[];
             stats: components["schemas"]["PackStatsDto"];
             createdBy: components["schemas"]["PersonRefDto"] | null;
         };
@@ -6113,6 +8413,23 @@ export interface components {
             value_en: string;
             /** @example 10 ساعات */
             value_ar: string;
+        };
+        ServiceHourDto: {
+            /**
+             * @description 1 = Monday … 7 = Sunday.
+             * @example 5
+             */
+            weekday: number;
+            /**
+             * @description `HH:mm`, Africa/Algiers.
+             * @example 20:00
+             */
+            startTime: string;
+            /**
+             * @description `HH:mm`; at or before `startTime` = past midnight. Must differ from it.
+             * @example 00:00
+             */
+            endTime: string;
         };
         ServiceExtraDto: {
             /** Format: uuid */
@@ -6279,6 +8596,25 @@ export interface components {
             maxEventsPerDay: number;
             /** @example 400 */
             maxGuests: number | null;
+            /**
+             * @description Different clients who may book overlapping hours.
+             * @example 1
+             */
+            concurrentClients: number;
+            /**
+             * Format: date
+             * @description First event date it can be booked for.
+             * @example 2027-03-01
+             */
+            availableFrom: string | null;
+            /**
+             * Format: date
+             * @description Last event date; hidden from the catalog after it.
+             * @example 2027-03-31
+             */
+            availableUntil: string | null;
+            /** @description Bookable hours per weekday; empty = any time. When set, bookings need times inside them. */
+            hours: components["schemas"]["ServiceHourDto"][];
             /** @example 3 */
             featuredPosition: number | null;
             /** @example 57 */
@@ -6288,7 +8624,7 @@ export interface components {
             wilayaDetails: components["schemas"]["ServiceWilayaDto"][];
             hidden: components["schemas"]["HiddenInfoDto"] | null;
             /** @description Why the service is not visible in the app (empty when visible). */
-            visibilityReasons: ("deleted" | "not_published" | "provider_blocked" | "provider_not_verified" | "provider_deleted" | "no_open_wilaya")[];
+            visibilityReasons: ("deleted" | "not_published" | "provider_blocked" | "provider_not_verified" | "provider_deleted" | "no_open_wilaya" | "period_ended")[];
             /** @description Publish checklist: what is still missing. */
             publishMissing: ("titleEn" | "titleAr" | "descriptionEn" | "descriptionAr" | "price" | "photos" | "category" | "wilayas")[];
             stats: components["schemas"]["ServiceStatsDetailDto"];
@@ -6327,6 +8663,25 @@ export interface components {
             maxEventsPerDay?: number;
             /** @example 400 */
             maxGuests?: number | null;
+            /**
+             * @description Different clients who may book overlapping hours (default 1). Whole-day bookings only count against `maxEventsPerDay`.
+             * @example 1
+             */
+            concurrentClients?: number;
+            /**
+             * Format: date
+             * @description First event date it can be booked for; null = no limit.
+             * @example 2027-03-01
+             */
+            availableFrom?: string | null;
+            /**
+             * Format: date
+             * @description Last event date; the service leaves the catalog after it. Not before `availableFrom`.
+             * @example 2027-03-31
+             */
+            availableUntil?: string | null;
+            /** @description Replaces the set. Empty = bookable at any hour. Ranges of one weekday must not overlap. */
+            hours?: components["schemas"]["ServiceHourDto"][];
             /**
              * @description Replaces the set; added wilayas must be open.
              * @example [
@@ -6398,6 +8753,25 @@ export interface components {
             /** @example 400 */
             maxGuests?: number | null;
             /**
+             * @description Different clients who may book overlapping hours (default 1). Whole-day bookings only count against `maxEventsPerDay`.
+             * @example 1
+             */
+            concurrentClients?: number;
+            /**
+             * Format: date
+             * @description First event date it can be booked for; null = no limit.
+             * @example 2027-03-01
+             */
+            availableFrom?: string | null;
+            /**
+             * Format: date
+             * @description Last event date; the service leaves the catalog after it. Not before `availableFrom`.
+             * @example 2027-03-31
+             */
+            availableUntil?: string | null;
+            /** @description Replaces the set. Empty = bookable at any hour. Ranges of one weekday must not overlap. */
+            hours?: components["schemas"]["ServiceHourDto"][];
+            /**
              * @description Replaces the set; added wilayas must be open.
              * @example [
              *       16,
@@ -6458,6 +8832,11 @@ export interface components {
             reference: string;
             /** @example accepted */
             status: string;
+            /**
+             * @description The booking’s client (calendar day items, P15c).
+             * @example Nadia Kaci
+             */
+            clientName: string | null;
         };
         AvailabilityBlockDto: {
             /**
@@ -7861,11 +10240,8 @@ export interface components {
             redactedComment?: string;
             /** @example Phone number removed, rest of the review kept. */
             note?: string;
-            /**
-             * @description Notify the author (hide / show / redact). Ignored for `dismiss_reports`.
-             * @default true
-             */
-            notifyAuthor: boolean;
+            /** @description Notify the author (hide / show / redact); true when omitted. Ignored for `dismiss_reports`. */
+            notifyAuthor?: boolean;
         };
         EditReviewDto: {
             /** @example Photos magnifiques, équipe très professionnelle. */
@@ -8081,6 +10457,17 @@ export interface components {
             /** @example 4 */
             completed: number;
         };
+        OverviewBookingsByStatusDto: {
+            /** @enum {string} */
+            status: "pending" | "accepted" | "declined" | "cancelled" | "completed";
+            /** @example 89 */
+            count: number;
+            /**
+             * @description Share of all bookings, one decimal.
+             * @example 47.3
+             */
+            percent: number;
+        };
         OverviewPartyDto: {
             /** Format: uuid */
             id: string;
@@ -8164,7 +10551,7 @@ export interface components {
             /** @description One entry per day of the period. */
             bookingsPerDay: components["schemas"]["BookingsPerDayDto"][];
             /** @description All time. */
-            bookingsByStatus: components["schemas"]["BookingsByStatusDto"][];
+            bookingsByStatus: components["schemas"]["OverviewBookingsByStatusDto"][];
             /** @description The 5 latest bookings of the last 24 h, or the 5 latest when none. */
             latestBookings: components["schemas"]["LatestBookingDto"][];
             /** @description The 8 latest activity log entries. */
@@ -8247,6 +10634,2855 @@ export interface components {
             exactMatch: components["schemas"]["ExactMatchDto"] | null;
             /** @description Groups in the scope, in a fixed order; empty groups included. */
             groups: components["schemas"]["SearchGroupDto"][];
+        };
+        AppWilayaRefDto: {
+            /** @example 16 */
+            code: number;
+            /**
+             * @description In the caller’s language.
+             * @example Alger
+             */
+            name: string;
+            /** @example Alger */
+            nameEn: string;
+            /** @example الجزائر */
+            nameAr: string;
+        };
+        AppCategoryRefDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example photography */
+            slug: string;
+            /**
+             * @description In the caller’s language.
+             * @example Photography
+             */
+            name: string;
+            /** @example Photography */
+            nameEn: string;
+            /** @example التصوير */
+            nameAr: string;
+            /** @example camera */
+            icon: string;
+        };
+        AppProviderProfileDto: {
+            /** @example Studio Lumière */
+            businessName: string;
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            /** @example We cover weddings across Alger. */
+            bio: string | null;
+            bioEn: string | null;
+            bioAr: string | null;
+            /**
+             * @example [
+             *       "ar",
+             *       "fr",
+             *       "en"
+             *     ]
+             */
+            languagesSpoken: string[] | null;
+            /** @example 6 */
+            yearsActive: number | null;
+            /**
+             * @description "Available for bookings" toggle (screen 21).
+             * @example true
+             */
+            acceptingBookings: boolean;
+            /** @example 4.80 */
+            avgRating: string;
+            /** @example 32 */
+            ratingCount: number;
+            /**
+             * @description "Events done" on screen 13.
+             * @example 48
+             */
+            completedBookingsCount: number;
+            wilayas: components["schemas"]["AppWilayaRefDto"][];
+        };
+        AppMeDto: {
+            /**
+             * Format: uuid
+             * @example 5b0d6c9e-4a51-4c3f-9d0e-2f6b8a7c1e24
+             */
+            id: string;
+            /**
+             * @example client
+             * @enum {string}
+             */
+            role: "client" | "provider" | "admin";
+            /**
+             * @example active
+             * @enum {string}
+             */
+            status: "active" | "blocked";
+            /**
+             * @example not_required
+             * @enum {string}
+             */
+            verificationStatus: "not_required" | "pending" | "verified" | "rejected";
+            /** @example Amina Benali */
+            fullName: string;
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+            /** @example true */
+            emailVerified: boolean;
+            /** @example +213555123456 */
+            phone: string | null;
+            /**
+             * @example en
+             * @enum {string}
+             */
+            language: "ar" | "en";
+            wilaya: components["schemas"]["AppWilayaRefDto"] | null;
+            /** @description Signed, expiring avatar URL. */
+            avatarUrl: string | null;
+            /** @description 320 px variant. */
+            avatarThumbUrl: string | null;
+            /** @description Providers only. */
+            provider: components["schemas"]["AppProviderProfileDto"] | null;
+            /**
+             * @description Unread notifications, for the bell badge.
+             * @example 0
+             */
+            unreadNotifications: number;
+            /**
+             * @description Conversations with unread messages.
+             * @example 0
+             */
+            unreadConversations: number;
+            /**
+             * Format: date-time
+             * @example 2026-09-01T08:30:00.000Z
+             */
+            createdAt: string;
+        };
+        AppSessionDto: {
+            /**
+             * @description JWT (HS256, audience `app`), send as `Authorization: Bearer`.
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…
+             */
+            accessToken: string;
+            /**
+             * @description Access token lifetime in seconds.
+             * @example 900
+             */
+            expiresIn: number;
+            /**
+             * @description Opaque, 30 days, single use. Keep it in secure storage — it is **not** a cookie on mobile.
+             * @example 0b8e1c52-7a44-4f0e-9d7b-3c2a1f6e5d40.1.q2VxY0l2Qm9yZkRqWkF4bUdLN3lQdE1zVHFjSWhOZ1Y
+             */
+            refreshToken: string;
+            user: components["schemas"]["AppMeDto"];
+        };
+        AppRegisterResultDto: {
+            /**
+             * Format: uuid
+             * @example 5b0d6c9e-4a51-4c3f-9d0e-2f6b8a7c1e24
+             */
+            userId: string;
+            /**
+             * @description False while the server runs without email (`/app/config` → `emailVerificationRequired: false`): the account is already verified, no code is sent, and `session` holds the tokens so the app skips screen 10.
+             * @example true
+             */
+            emailVerificationRequired: boolean;
+            /**
+             * Format: email
+             * @description Shown on screen 10 ("We sent a 6-digit code to …"). Null when no code was sent.
+             * @example amina.benali@email.com
+             */
+            emailSentTo: string | null;
+            /**
+             * Format: date-time
+             * @description When the code stops working. Null when no code was sent.
+             * @example 2026-09-20T10:15:00.000Z
+             */
+            expiresAt: string | null;
+            /**
+             * @description Seconds before "Resend" may be used. Null when no code was sent.
+             * @example 60
+             */
+            resendAfterSeconds: number | null;
+            /**
+             * @description Providers start `pending`; clients are `not_required`.
+             * @example pending
+             * @enum {string}
+             */
+            verificationStatus: "not_required" | "pending" | "verified" | "rejected";
+            /** @description Tokens and user when `emailVerificationRequired` is false (the user is signed in straight away); null otherwise. */
+            session: components["schemas"]["AppSessionDto"] | null;
+        };
+        AppRegisterDto: {
+            /**
+             * @description Chosen on screen 06 Role selection. Immutable afterwards.
+             * @example client
+             * @enum {string}
+             */
+            role: "client" | "provider";
+            /** @example Amina Benali */
+            fullName: string;
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+            /**
+             * @description `0XXXXXXXXX` or `+213XXXXXXXXX`; stored as `+213XXXXXXXXX`.
+             * @example 0555123456
+             */
+            phone: string;
+            /**
+             * @description At least 10 characters with a letter and a digit (422 PASSWORD_WEAK otherwise).
+             * @example Sunflower42x
+             */
+            password: string;
+            /**
+             * @description Language toggle on screens 08/08a.
+             * @example en
+             * @enum {string}
+             */
+            language: "ar" | "en";
+            /**
+             * @description The wilaya the account lives in.
+             * @example 16
+             */
+            wilayaCode?: number;
+            /**
+             * @description Providers only (required). 422 PROVIDER_FIELDS_REQUIRED when missing.
+             * @example Studio Lumière
+             */
+            businessName?: string;
+            /**
+             * Format: uuid
+             * @description Providers only (required): the category they work in.
+             */
+            categoryId?: string;
+            /**
+             * @description Providers only: the wilayas they cover. Defaults to `wilayaCode`.
+             * @example [
+             *       16,
+             *       9
+             *     ]
+             */
+            wilayaCodes?: number[];
+        };
+        AppVerifyEmailDto: {
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+            /**
+             * @description The 6 digits typed on screen 10.
+             * @example 284917
+             */
+            code: string;
+        };
+        AppCodeSentDto: {
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+            /**
+             * Format: date-time
+             * @example 2026-09-20T10:15:00.000Z
+             */
+            expiresAt: string;
+            /** @example 60 */
+            resendAfterSeconds: number;
+        };
+        AppResendCodeDto: {
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+        };
+        AppLoginDto: {
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+            /** @example Sunflower42x */
+            password: string;
+        };
+        AppRefreshDto: {
+            /**
+             * @description The refresh token from the previous login / refresh response. Rotates on every use.
+             * @example 0b8e1c52-7a44-4f0e-9d7b-3c2a1f6e5d40.1.q2VxY0l2Qm9yZkRqWkF4bUdLN3lQdE1zVHFjSWhOZ1Y
+             */
+            refreshToken: string;
+        };
+        AppLogoutDto: {
+            /** @description The refresh token to revoke. When absent, the bearer token’s session is revoked. */
+            refreshToken?: string;
+        };
+        AppForgotPasswordDto: {
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+        };
+        AppVerifyResetCodeDto: {
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+            /**
+             * @description The 6-digit code emailed by `/app/auth/forgot`. Checking it here does **not** consume it.
+             * @example 284917
+             */
+            code: string;
+        };
+        AppResetPasswordDto: {
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+            /**
+             * @description The 6-digit code emailed by `/app/auth/forgot`.
+             * @example 284917
+             */
+            code: string;
+            /**
+             * @description At least 10 characters with a letter and a digit (422 PASSWORD_WEAK otherwise).
+             * @example Sunflower42x
+             */
+            password: string;
+        };
+        AppSetPasswordDto: {
+            /**
+             * @description The `token` query parameter of `${APP_PUBLIC_URL}/set-password?token=…`.
+             * @example 0b8e1c52-7a44-4f0e-9d7b-3c2a1f6e5d40.q2VxY0l2Qm9yZkRqWkF4bUdLN3lQdE1zVHFjSWhOZ1Y
+             */
+            token: string;
+            /**
+             * @description At least 10 characters with a letter and a digit (422 PASSWORD_WEAK otherwise).
+             * @example Sunflower42x
+             */
+            password: string;
+        };
+        UpdateAppMeDto: {
+            /** @example Amina Benali */
+            fullName?: string;
+            /**
+             * @description Null clears it.
+             * @example 0555123456
+             */
+            phone?: string | null;
+            /** @enum {string} */
+            language?: "ar" | "en";
+            /**
+             * @description Null clears it.
+             * @example 16
+             */
+            wilayaCode?: number | null;
+            /**
+             * Format: uuid
+             * @description A file id from `POST /app/me/avatar`; null removes the avatar.
+             */
+            avatarFileId?: string | null;
+        };
+        AppChangePasswordDto: {
+            /** @example Sunflower42x */
+            currentPassword: string;
+            /** @example Bluebird99z */
+            newPassword: string;
+        };
+        DeleteAppMeDto: {
+            /**
+             * @description The account’s current password (confirmation).
+             * @example Sunflower42x
+             */
+            password: string;
+        };
+        AppSessionRowDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Chrome on Android */
+            deviceLabel: string | null;
+            /** @example 41.100.12.8 */
+            ip: string | null;
+            /**
+             * @description The session this request is using.
+             * @example true
+             */
+            current: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastUsedAt: string | null;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        RevokedSessionsDto: {
+            /**
+             * @description Sessions revoked by the call.
+             * @example 2
+             */
+            revoked: number;
+        };
+        AppDocumentDto: {
+            /**
+             * Format: uuid
+             * @description Null when nothing was uploaded for this type yet.
+             */
+            id: string | null;
+            /**
+             * @example national_id
+             * @enum {string}
+             */
+            type: "national_id" | "commercial_register_or_artisan_card" | "tax_card";
+            /**
+             * @description Label in the caller’s language.
+             * @example National ID card
+             */
+            label: string;
+            /**
+             * @example pending
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected" | "missing";
+            /** @description Signed, expiring URL of the uploaded file. */
+            fileUrl: string | null;
+            /**
+             * @example name_mismatch
+             * @enum {string|null}
+             */
+            rejectReason: "unreadable" | "expired" | "name_mismatch" | "wrong_document" | "other" | null;
+            /** @example Details do not match the account */
+            rejectReasonLabel: string | null;
+            /** @example The name on the NIF card does not match your account name. */
+            rejectNote: string | null;
+            /** Format: date-time */
+            reviewedAt: string | null;
+            /** Format: date-time */
+            submittedAt: string | null;
+            /**
+             * @description True when this version replaces an earlier one.
+             * @example false
+             */
+            resubmitted: boolean;
+        };
+        AppDocumentsDto: {
+            /**
+             * @example rejected
+             * @enum {string}
+             */
+            verificationStatus: "not_required" | "pending" | "verified" | "rejected";
+            /**
+             * @description True while at least one document is missing or rejected (screen 08d "Action needed").
+             * @example true
+             */
+            actionNeeded: boolean;
+            /**
+             * @description `max_document_upload_mb`.
+             * @example 5
+             */
+            maxFileSizeMb: number;
+            /**
+             * @example [
+             *       "application/pdf",
+             *       "image/jpeg",
+             *       "image/png",
+             *       "image/webp"
+             *     ]
+             */
+            acceptedTypes: string[];
+            documents: components["schemas"]["AppDocumentDto"][];
+            /**
+             * @example {
+             *       "approved": 2,
+             *       "rejected": 1,
+             *       "waiting": 0,
+             *       "missing": 0
+             *     }
+             */
+            progress: Record<string, never>;
+        };
+        AppDeviceTokenDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example fcm-token-eXaMpLe-123 */
+            token: string;
+            /** @enum {string} */
+            platform: "android" | "ios" | "web";
+            /** Format: date-time */
+            lastSeenAt: string | null;
+        };
+        RegisterDeviceTokenDto: {
+            /** @example fcm-token-eXaMpLe-123 */
+            token: string;
+            /**
+             * @example android
+             * @enum {string}
+             */
+            platform: "android" | "ios" | "web";
+        };
+        AppNotificationPreferencesDto: {
+            /** @example true */
+            pushBookings: boolean;
+            /** @example true */
+            pushMessages: boolean;
+            /** @example true */
+            pushReviews: boolean;
+            /** @example true */
+            emailBookings: boolean;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        UpdateNotificationPreferencesDto: {
+            pushBookings?: boolean;
+            pushMessages?: boolean;
+            pushReviews?: boolean;
+            emailBookings?: boolean;
+        };
+        AppNotificationDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description Stable machine type. `dispute.*` and message-related types carry `data.conversationId`, so a tap opens the right chat without parsing URLs.
+             * @example dispute.message
+             * @enum {string}
+             */
+            type: "dispute.opened" | "dispute.message" | "dispute.evidence_requested" | "dispute.resolved" | "dispute.closed" | "review.new" | "review.shown" | "review.hidden" | "review.redacted" | "review_reply.hidden" | "review_reply.shown" | "report.resolved" | "report.dismissed" | "academic_request.cancelled" | "verification.approved" | "verification.rejected";
+            /** @example Dispute DSP-000012 */
+            title: string;
+            /** @example New message from Eventor support. */
+            body: string;
+            /**
+             * @description Typed ids for the deep link: `bookingId`, `conversationId`, `disputeId`, `requestId`, `reviewId`, `reportId` as the type requires. When a `href` appears it is a web path relative to `APP_PUBLIC_URL` — prefer the ids; never parse URLs.
+             * @example {
+             *       "disputeId": "…",
+             *       "bookingId": "…",
+             *       "conversationId": "…"
+             *     }
+             */
+            data: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * @description The section of screen 16 this row belongs to (Africa/Algiers).
+             * @example today
+             * @enum {string}
+             */
+            group: "today" | "this_week" | "earlier";
+            /** @example false */
+            read: boolean;
+            /** Format: date-time */
+            readAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        MarkedReadDto: {
+            /**
+             * @description Rows changed.
+             * @example 3
+             */
+            marked: number;
+            /** @example 0 */
+            unread: number;
+        };
+        AppFavouriteDto: {
+            /**
+             * Format: uuid
+             * @description The favourite row id — pass it to `DELETE /app/me/favourites/:id`.
+             */
+            id: string;
+            /**
+             * @example service
+             * @enum {string}
+             */
+            kind: "service" | "pack";
+            /**
+             * Format: uuid
+             * @description The service or pack id.
+             */
+            targetId: string;
+            /**
+             * @description In the caller’s language.
+             * @example Wedding photo & video coverage
+             */
+            title: string;
+            /** @example Wedding photo & video coverage */
+            titleEn: string;
+            /** @example تغطية تصوير الأعراس */
+            titleAr: string;
+            /** @example Studio Lumière */
+            providerName: string;
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            /**
+             * @description DZD, 2 decimals ("From 45 000 DA").
+             * @example 45000.00
+             */
+            fromPrice: string;
+            /** @description Cover photo, 320 px. */
+            coverUrl: string | null;
+            /** @example 4.80 */
+            avgRating: string;
+            /** @example 32 */
+            ratingCount: number;
+            /**
+             * @description False once the target stops being visible in the app (kept in the list, greyed out).
+             * @example true
+             */
+            available: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateFavouriteDto: {
+            /**
+             * Format: uuid
+             * @description Exactly one of `serviceId` / `packId` (422 FAVOURITE_TARGET_INVALID).
+             */
+            serviceId?: string;
+            /** Format: uuid */
+            packId?: string;
+        };
+        AppBudgetItemDto: {
+            /** Format: uuid */
+            id: string;
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            /** @example Venue */
+            label: string;
+            /** @example 120000.00 */
+            plannedAmount: string;
+            /** @example 110000.00 */
+            spentAmount: string;
+            /** Format: uuid */
+            bookingId: string | null;
+            /** @example EVT-000123 */
+            bookingReference: string | null;
+            /**
+             * @description Provider of the linked booking, or null ("Not booked yet").
+             * @example Salle Yasmine
+             */
+            providerName: string | null;
+            /** @example 0 */
+            position: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppBudgetDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Our wedding */
+            title: string;
+            /**
+             * Format: date
+             * @example 2026-03-14
+             */
+            eventDate: string | null;
+            /**
+             * @description The client’s declared plan ceiling ("of 400 000 DA planned"), set with `PUT /app/me/budget`. **Intentionally independent of the lines**: it may be above or below `plannedTotal`.
+             * @example 400000.00
+             */
+            totalAmount: string;
+            /**
+             * @description Sum of the lines’ planned amounts. May diverge from `totalAmount` — that gap is the screen’s "unallocated / over plan" signal, not an error.
+             * @example 380000.00
+             */
+            plannedTotal: string;
+            /**
+             * @description Sum of the lines’ spent amounts.
+             * @example 180000.00
+             */
+            spentTotal: string;
+            /**
+             * @description `totalAmount` − `spentTotal` (the ceiling, **not** `plannedTotal`); may be negative.
+             * @example 220000.00
+             */
+            remaining: string;
+            /** @example 45 */
+            spentPercent: number;
+            /**
+             * @description "3 of 6 services booked" — the 6.
+             * @example 6
+             */
+            itemsCount: number;
+            /**
+             * @description Lines linked to a booking — the 3.
+             * @example 3
+             */
+            bookedCount: number;
+            items: components["schemas"]["AppBudgetItemDto"][];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PutBudgetDto: {
+            /** @example Our wedding */
+            title: string;
+            /**
+             * Format: date
+             * @example 2026-03-14
+             */
+            eventDate?: string | null;
+            /**
+             * @description DZD with 2 decimals.
+             * @example 400000.00
+             */
+            totalAmount: string;
+        };
+        CreateBudgetItemDto: {
+            /** Format: uuid */
+            categoryId?: string | null;
+            /** @example Venue */
+            label: string;
+            /**
+             * @default 0.00
+             * @example 120000.00
+             */
+            plannedAmount: string;
+            /**
+             * @default 0.00
+             * @example 110000.00
+             */
+            spentAmount: string;
+            /**
+             * Format: uuid
+             * @description One of my bookings; 404 BOOKING_NOT_FOUND when it is not. **One line per booking**: linking a booking already held by another line answers 409 `BUDGET_BOOKING_ALREADY_LINKED` with `details.itemId`. A cancelled booking keeps its line and its link.
+             */
+            bookingId?: string | null;
+        };
+        UpdateBudgetItemDto: {
+            /** Format: uuid */
+            categoryId?: string | null;
+            /** @example Venue */
+            label?: string;
+            /**
+             * @default 0.00
+             * @example 120000.00
+             */
+            plannedAmount: string;
+            /**
+             * @default 0.00
+             * @example 110000.00
+             */
+            spentAmount: string;
+            /**
+             * Format: uuid
+             * @description One of my bookings; 404 BOOKING_NOT_FOUND when it is not. **One line per booking**: linking a booking already held by another line answers 409 `BUDGET_BOOKING_ALREADY_LINKED` with `details.itemId`. A cancelled booking keeps its line and its link.
+             */
+            bookingId?: string | null;
+        };
+        AppAcademicRequestRowDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example ACR-000142 */
+            reference: string;
+            /** @example Graduation ceremony · Faculty of Medicine */
+            title: string;
+            /**
+             * @example pending
+             * @enum {string}
+             */
+            status: "pending" | "changes_requested" | "approved" | "in_progress" | "rejected" | "completed" | "cancelled";
+            /**
+             * Format: date
+             * @example 2026-06-30
+             */
+            eventDate: string | null;
+            /** Format: date-time */
+            submittedAt: string;
+        };
+        AppAcademicAnswerDto: {
+            /** @example attendees */
+            key: string;
+            /**
+             * @description The field type of the form version.
+             * @example number
+             */
+            type: string;
+            /** @example Expected attendees */
+            labelEn: string;
+            /** @example عدد الحضور المتوقع */
+            labelAr: string;
+            /**
+             * @description The form section the field belongs to.
+             * @example General
+             */
+            section: string | null;
+            /** @description The raw answer as submitted. */
+            value: Record<string, never> | null;
+            /**
+             * @description The answer rendered for display (choices resolved, wilaya and file names filled in).
+             * @example 250
+             */
+            displayValue: string | null;
+        };
+        AppAcademicRequestDetailDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example ACR-000142 */
+            reference: string;
+            /** @example Graduation ceremony · Faculty of Medicine */
+            title: string;
+            /**
+             * @example pending
+             * @enum {string}
+             */
+            status: "pending" | "changes_requested" | "approved" | "in_progress" | "rejected" | "completed" | "cancelled";
+            /**
+             * Format: date
+             * @example 2026-06-30
+             */
+            eventDate: string | null;
+            /** Format: date-time */
+            submittedAt: string;
+            /** @description Every answer, rendered with the form version the request was submitted with. */
+            answers: components["schemas"]["AppAcademicAnswerDto"][];
+        };
+        AppCategoryDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example photography */
+            slug: string;
+            /**
+             * @description In the caller’s language.
+             * @example Photography
+             */
+            name: string;
+            /** @example Photography */
+            nameEn: string;
+            /** @example التصوير */
+            nameAr: string;
+            /** @example camera */
+            icon: string;
+            /** @example 1 */
+            position: number;
+            /**
+             * @description Visible services in this category.
+             * @example 42
+             */
+            servicesCount: number;
+        };
+        AppHomeBookingDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example EVT-000123 */
+            reference: string;
+            /** @example Studio Lumière */
+            providerName: string;
+            providerAvatarUrl: string | null;
+            /** @example Wedding photo & video coverage */
+            title: string | null;
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            /**
+             * Format: date
+             * @example 2026-03-14
+             */
+            eventDate: string;
+            /** @example 13:00 */
+            startTime: string | null;
+            /**
+             * @example accepted
+             * @enum {string}
+             */
+            status: "pending" | "accepted" | "declined" | "cancelled" | "completed";
+            coverUrl: string | null;
+        };
+        AppHomeBudgetDto: {
+            /**
+             * @description False when the client has no budget yet (the card offers to create one).
+             * @example true
+             */
+            exists: boolean;
+            /** @example 180000.00 */
+            spentTotal: string;
+            /** @example 400000.00 */
+            totalAmount: string;
+            /** @example 45 */
+            spentPercent: number;
+            /** @example 3 */
+            bookedCount: number;
+            /** @example 6 */
+            itemsCount: number;
+        };
+        AppProviderSummaryDto: {
+            /**
+             * Format: uuid
+             * @description The provider’s **user id** — the same id `GET /app/providers/{id}` takes and `POST /app/conversations` accepts as `userId` for the "Message" button.
+             */
+            id: string;
+            /** @example Studio Lumière */
+            businessName: string;
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            avatarUrl: string | null;
+            /**
+             * @description "Verified provider" badge.
+             * @example true
+             */
+            verified: boolean;
+            /** @example 4.80 */
+            avgRating: string;
+            /** @example 32 */
+            ratingCount: number;
+            /**
+             * @description "events done".
+             * @example 48
+             */
+            completedBookingsCount: number;
+            /**
+             * @description "6 years on Eventor".
+             * @example 6
+             */
+            yearsActive: number | null;
+            /**
+             * @description Average first reply, in minutes.
+             * @example 120
+             */
+            avgReplyMinutes: number | null;
+            /**
+             * @description "Usually replies in 2 h".
+             * @example 2 h
+             */
+            replyTime: string | null;
+            /**
+             * @description False hides the booking CTA (provider paused bookings).
+             * @example true
+             */
+            acceptingBookings: boolean;
+        };
+        AppPackCardDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Essentiel Mariage */
+            name: string;
+            /** @example Essentiel Mariage */
+            nameEn: string;
+            /** @example أساسيات الزفاف */
+            nameAr: string;
+            /**
+             * @example wedding
+             * @enum {string}
+             */
+            eventType: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
+            wilaya: components["schemas"]["AppWilayaRefDto"];
+            /** @example 320000.00 */
+            price: string;
+            /**
+             * @description Sum of the items’ base prices ("versus booking separately").
+             * @example 365000.00
+             */
+            sumOfItems: string;
+            /**
+             * @description "Save 45 000 DA".
+             * @example 45000.00
+             */
+            savings: string;
+            /** @example 12.3 */
+            savingsPercent: number;
+            /** @example 4 */
+            itemsCount: number;
+            /**
+             * @description Category names, in order ("Venue · Photo · Catering").
+             * @example [
+             *       "Venue",
+             *       "Photography",
+             *       "Catering"
+             *     ]
+             */
+            categoryNames: string[];
+            coverUrl: string | null;
+            /**
+             * @description A number (0–5, 2 decimals), like every pack rating.
+             * @example 4.9
+             */
+            avgRating: number;
+            /** @example 18 */
+            ratingCount: number;
+            /**
+             * @description "booked 12 times this year".
+             * @example 12
+             */
+            bookingsCount: number;
+            provider: components["schemas"]["AppProviderSummaryDto"];
+            /** @example false */
+            isFavourite: boolean;
+            /**
+             * Format: uuid
+             * @description The caller’s favourite row over this pack (null when not saved, or anonymous). Un-save with `DELETE /app/me/favourites/{favouriteId}` — or by target with `DELETE /app/me/favourites?packId=`.
+             */
+            favouriteId: string | null;
+        };
+        AppServiceCardDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description In the caller’s language.
+             * @example Wedding photo & video coverage
+             */
+            title: string;
+            /** @example Wedding photo & video coverage */
+            titleEn: string;
+            /** @example تغطية تصوير الأعراس */
+            titleAr: string;
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            /**
+             * @description DZD, 2 decimals.
+             * @example 45000.00
+             */
+            basePrice: string;
+            /**
+             * @example per_day
+             * @enum {string}
+             */
+            priceType: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
+            /**
+             * @description Price type in the caller’s language.
+             * @example per day
+             */
+            priceTypeLabel: string;
+            /** @example 4.80 */
+            avgRating: string;
+            /** @example 32 */
+            ratingCount: number;
+            /** @example 12 */
+            bookingsCount: number;
+            coverUrl: string | null;
+            /** @description Open wilayas the service covers. */
+            wilayas: components["schemas"]["AppWilayaRefDto"][];
+            provider: components["schemas"]["AppProviderSummaryDto"];
+            /**
+             * @description Always false for anonymous callers.
+             * @example false
+             */
+            isFavourite: boolean;
+            /**
+             * Format: uuid
+             * @description The caller’s favourite row over this service (null when not saved, or anonymous). Un-save with `DELETE /app/me/favourites/{favouriteId}` — or by target with `DELETE /app/me/favourites?serviceId=`.
+             */
+            favouriteId: string | null;
+        };
+        AppHomeDto: {
+            /** @example Amina Benali */
+            fullName: string;
+            avatarUrl: string | null;
+            /** @description The city selector at the top of screen 11. */
+            wilaya: components["schemas"]["AppWilayaRefDto"] | null;
+            /** @example 2 */
+            unreadNotifications: number;
+            /** @example 1 */
+            unreadConversations: number;
+            categories: components["schemas"]["AppCategoryDto"][];
+            /** @description The next 2 bookings ("Your bookings"). */
+            upcomingBookings: components["schemas"]["AppHomeBookingDto"][];
+            budget: components["schemas"]["AppHomeBudgetDto"];
+            /** @description "Ready Packs". */
+            packs: components["schemas"]["AppPackCardDto"][];
+            /** @description "Providers near you": services in my wilaya, best rated first. */
+            nearbyServices: components["schemas"]["AppServiceCardDto"][];
+        };
+        AppWilayaListDto: {
+            /** @example 16 */
+            code: number;
+            /**
+             * @description In the caller’s language.
+             * @example Alger
+             */
+            name: string;
+            /** @example Alger */
+            nameEn: string;
+            /** @example الجزائر */
+            nameAr: string;
+            /**
+             * @description Services visible in the app that cover this wilaya. The list is ordered by this count (highest first) — there is no separate `position`.
+             * @example 42
+             */
+            servicesCount: number;
+        };
+        AppCommuneDto: {
+            /**
+             * Format: uuid
+             * @description Send it as `communeId` on `POST /app/bookings`.
+             */
+            id: string;
+            /** @example 16 */
+            wilayaCode: number;
+            /**
+             * @description In the caller’s language.
+             * @example Hydra
+             */
+            name: string;
+            /** @example Hydra */
+            nameEn: string;
+            /** @example حيدرة */
+            nameAr: string;
+            /** @example 16035 */
+            postalCode: string | null;
+        };
+        AppServiceFactDto: {
+            /** @example Duration */
+            label: string;
+            /** @example 10 h */
+            value: string;
+            /** @example Duration */
+            labelEn: string;
+            /** @example 10 h */
+            valueEn: string;
+            /** @example المدة */
+            labelAr: string;
+            /** @example 10 ساعات */
+            valueAr: string;
+        };
+        AppServiceExtraDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Pre-wedding session */
+            name: string;
+            /** @example Pre-wedding session */
+            nameEn: string;
+            /** @example جلسة ما قبل الزفاف */
+            nameAr: string;
+            /** @example 12000.00 */
+            price: string;
+        };
+        AppPhotoDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description 320 px WebP. */
+            thumbUrl: string;
+            /** @description 800 px WebP. */
+            mediumUrl: string;
+            /** @description Full-size WebP (capped at `photo_max_dimension_px`). */
+            largeUrl: string;
+            /** @example 1920 */
+            width: number | null;
+            /** @example 1280 */
+            height: number | null;
+        };
+        AppRatingBucketDto: {
+            /** @example 5 */
+            stars: number;
+            /** @example 24 */
+            count: number;
+            /** @example 75 */
+            percent: number;
+        };
+        AppReviewDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description The author’s first name plus an initial — never the full name, email or phone.
+             * @example Yasmine K.
+             */
+            authorName: string;
+            authorAvatarUrl: string | null;
+            /** @example 5 */
+            rating: number;
+            /**
+             * @description The redacted text when an admin redacted the review.
+             * @example Wonderful team, the photos arrived in two weeks.
+             */
+            comment: string;
+            /**
+             * @description True when an admin removed contact details from the text.
+             * @example false
+             */
+            redacted: boolean;
+            /**
+             * @description The provider’s published reply.
+             * @example Thank you Yasmine!
+             */
+            reply: string | null;
+            /** Format: date-time */
+            repliedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppServiceDetailDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description In the caller’s language.
+             * @example Wedding photo & video coverage
+             */
+            title: string;
+            /** @example Wedding photo & video coverage */
+            titleEn: string;
+            /** @example تغطية تصوير الأعراس */
+            titleAr: string;
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            /**
+             * @description DZD, 2 decimals.
+             * @example 45000.00
+             */
+            basePrice: string;
+            /**
+             * @example per_day
+             * @enum {string}
+             */
+            priceType: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
+            /**
+             * @description Price type in the caller’s language.
+             * @example per day
+             */
+            priceTypeLabel: string;
+            /** @example 4.80 */
+            avgRating: string;
+            /** @example 32 */
+            ratingCount: number;
+            /** @example 12 */
+            bookingsCount: number;
+            coverUrl: string | null;
+            /** @description Open wilayas the service covers. */
+            wilayas: components["schemas"]["AppWilayaRefDto"][];
+            provider: components["schemas"]["AppProviderSummaryDto"];
+            /**
+             * @description Always false for anonymous callers.
+             * @example false
+             */
+            isFavourite: boolean;
+            /**
+             * Format: uuid
+             * @description The caller’s favourite row over this service (null when not saved, or anonymous). Un-save with `DELETE /app/me/favourites/{favouriteId}` — or by target with `DELETE /app/me/favourites?serviceId=`.
+             */
+            favouriteId: string | null;
+            /** @example We cover the whole day… */
+            description: string;
+            /** @example We cover the whole day… */
+            descriptionEn: string;
+            /** @example نغطي اليوم بأكمله… */
+            descriptionAr: string;
+            /**
+             * @description "Good to know" / cancellation policy.
+             * @example Free cancellation up to 30 days before.
+             */
+            cancellationPolicy: string | null;
+            cancellationPolicyEn: string | null;
+            cancellationPolicyAr: string | null;
+            /** @description Key facts (duration, team, deliverables). */
+            facts: components["schemas"]["AppServiceFactDto"][];
+            /** @description "What’s included" / paid add-ons. */
+            extras: components["schemas"]["AppServiceExtraDto"][];
+            photos: components["schemas"]["AppPhotoDto"][];
+            /** @example 300 */
+            maxGuests: number | null;
+            /**
+             * @description Events the provider takes per day for this service.
+             * @example 1
+             */
+            maxEventsPerDay: number;
+            /**
+             * @description Different clients who may book overlapping hours (timed bookings).
+             * @example 1
+             */
+            concurrentClients: number;
+            /**
+             * Format: date
+             * @description First event date it can be booked for.
+             * @example 2027-03-01
+             */
+            availableFrom: string | null;
+            /**
+             * Format: date
+             * @description Last event date it can be booked for.
+             * @example 2027-03-31
+             */
+            availableUntil: string | null;
+            /** @description Bookable hours per weekday (1 = Monday … 7 = Sunday). Empty = any time. When not empty, a booking needs times inside one range of its weekday. */
+            hours: components["schemas"]["ServiceHourDto"][];
+            ratingBreakdown: components["schemas"]["AppRatingBucketDto"][];
+            recentReviews: components["schemas"]["AppReviewDto"][];
+            /** @description "Packs from this provider". */
+            providerPacks: components["schemas"]["AppPackCardDto"][];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        AppTimeRangeDto: {
+            /** @example 20:00 */
+            startTime: string;
+            /**
+             * @description At or before `startTime` = past midnight; 00:00 → 00:00 is the whole day.
+             * @example 00:00
+             */
+            endTime: string;
+        };
+        AppAvailabilityDayDto: {
+            /**
+             * Format: date
+             * @example 2026-03-14
+             */
+            date: string;
+            /**
+             * @example available
+             * @enum {string}
+             */
+            state: "available" | "busy" | "blocked";
+            /** @description Service calendars only (null for packs): the hours still free that day — the service hours minus partial blocks and moments already booked by `concurrentClients` clients. Empty unless `state` is `available`. */
+            freeRanges: components["schemas"]["AppTimeRangeDto"][] | null;
+        };
+        AppAvailabilityDto: {
+            /** @example 2026-03 */
+            month: string;
+            /**
+             * @description Events accepted per day (the smallest among a pack’s items).
+             * @example 1
+             */
+            maxEventsPerDay: number;
+            /**
+             * @description `booking_min_notice_days`: days before which nothing can be booked.
+             * @example 0
+             */
+            minNoticeDays: number;
+            /**
+             * Format: date
+             * @description First bookable day (Africa/Algiers).
+             * @example 2026-03-01
+             */
+            firstBookableDate: string;
+            days: components["schemas"]["AppAvailabilityDayDto"][];
+        };
+        AppProviderCheckDto: {
+            /** @example identity */
+            code: string;
+            /** @example Identity verified */
+            title: string;
+            /** @example National ID checked by Eventor */
+            detail: string;
+            /** @example true */
+            passed: boolean;
+        };
+        AppProviderDetailDto: {
+            /**
+             * Format: uuid
+             * @description The provider’s **user id** — the same id `GET /app/providers/{id}` takes and `POST /app/conversations` accepts as `userId` for the "Message" button.
+             */
+            id: string;
+            /** @example Studio Lumière */
+            businessName: string;
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            avatarUrl: string | null;
+            /**
+             * @description "Verified provider" badge.
+             * @example true
+             */
+            verified: boolean;
+            /** @example 4.80 */
+            avgRating: string;
+            /** @example 32 */
+            ratingCount: number;
+            /**
+             * @description "events done".
+             * @example 48
+             */
+            completedBookingsCount: number;
+            /**
+             * @description "6 years on Eventor".
+             * @example 6
+             */
+            yearsActive: number | null;
+            /**
+             * @description Average first reply, in minutes.
+             * @example 120
+             */
+            avgReplyMinutes: number | null;
+            /**
+             * @description "Usually replies in 2 h".
+             * @example 2 h
+             */
+            replyTime: string | null;
+            /**
+             * @description False hides the booking CTA (provider paused bookings).
+             * @example true
+             */
+            acceptingBookings: boolean;
+            bio: string | null;
+            bioEn: string | null;
+            bioAr: string | null;
+            /**
+             * @example [
+             *       "ar",
+             *       "fr",
+             *       "en"
+             *     ]
+             */
+            languagesSpoken: string[] | null;
+            /** @description "Where they work". */
+            wilayas: components["schemas"]["AppWilayaRefDto"][];
+            /** @description "What we checked". */
+            checks: components["schemas"]["AppProviderCheckDto"][];
+            /** @example 5 */
+            servicesCount: number;
+            services: components["schemas"]["AppServiceCardDto"][];
+            packs: components["schemas"]["AppPackCardDto"][];
+            ratingBreakdown: components["schemas"]["AppRatingBucketDto"][];
+            recentReviews: components["schemas"]["AppReviewDto"][];
+            /**
+             * Format: date-time
+             * @description Account creation ("on Eventor since").
+             */
+            memberSince: string;
+        };
+        AppPackItemDto: {
+            /** Format: uuid */
+            serviceId: string;
+            /** @example Grande salle */
+            title: string;
+            /** @example Grande salle */
+            titleEn: string;
+            /** @example القاعة الكبرى */
+            titleAr: string;
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            /** @example 200000.00 */
+            price: string;
+            /** @enum {string} */
+            priceType: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
+            coverUrl: string | null;
+            /** @example 0 */
+            position: number;
+        };
+        AppPackDetailDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Essentiel Mariage */
+            name: string;
+            /** @example Essentiel Mariage */
+            nameEn: string;
+            /** @example أساسيات الزفاف */
+            nameAr: string;
+            /**
+             * @example wedding
+             * @enum {string}
+             */
+            eventType: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
+            wilaya: components["schemas"]["AppWilayaRefDto"];
+            /** @example 320000.00 */
+            price: string;
+            /**
+             * @description Sum of the items’ base prices ("versus booking separately").
+             * @example 365000.00
+             */
+            sumOfItems: string;
+            /**
+             * @description "Save 45 000 DA".
+             * @example 45000.00
+             */
+            savings: string;
+            /** @example 12.3 */
+            savingsPercent: number;
+            /** @example 4 */
+            itemsCount: number;
+            /**
+             * @description Category names, in order ("Venue · Photo · Catering").
+             * @example [
+             *       "Venue",
+             *       "Photography",
+             *       "Catering"
+             *     ]
+             */
+            categoryNames: string[];
+            coverUrl: string | null;
+            /**
+             * @description A number (0–5, 2 decimals), like every pack rating.
+             * @example 4.9
+             */
+            avgRating: number;
+            /** @example 18 */
+            ratingCount: number;
+            /**
+             * @description "booked 12 times this year".
+             * @example 12
+             */
+            bookingsCount: number;
+            provider: components["schemas"]["AppProviderSummaryDto"];
+            /** @example false */
+            isFavourite: boolean;
+            /**
+             * Format: uuid
+             * @description The caller’s favourite row over this pack (null when not saved, or anonymous). Un-save with `DELETE /app/me/favourites/{favouriteId}` — or by target with `DELETE /app/me/favourites?packId=`.
+             */
+            favouriteId: string | null;
+            /** @example Everything for a 150-guest wedding in Alger. */
+            description: string | null;
+            descriptionEn: string | null;
+            descriptionAr: string | null;
+            /** @example 150 */
+            maxGuests: number | null;
+            photos: components["schemas"]["AppPhotoDto"][];
+            items: components["schemas"]["AppPackItemDto"][];
+            /** @description Wilayas every item covers (the intersection). */
+            wilayas: components["schemas"]["AppWilayaRefDto"][];
+            recentReviews: components["schemas"]["AppReviewDto"][];
+        };
+        TrackEventDto: {
+            /**
+             * @example service_view
+             * @enum {string}
+             */
+            type: "service_view" | "search";
+            /**
+             * Format: uuid
+             * @description The service opened (`service_view`).
+             */
+            serviceId?: string;
+            /**
+             * @description The text typed (`search`).
+             * @example photographe mariage
+             */
+            query?: string;
+            /** Format: uuid */
+            categoryId?: string;
+            /** @example 16 */
+            wilaya?: number;
+        };
+        AppConfigLimitsDto: {
+            /**
+             * @description Maximum budget lines per client (`422 BUDGET_ITEM_LIMIT` past it, with `details.max`).
+             * @example 60
+             */
+            budgetItemsMax: number;
+            /**
+             * @description `max_photos_per_service` (422 `PHOTO_LIMIT_REACHED`).
+             * @example 12
+             */
+            photosPerService: number;
+            /**
+             * @description `max_photos_per_pack`.
+             * @example 6
+             */
+            photosPerPack: number;
+            /**
+             * @description `max_document_upload_mb` — verification documents and dispute evidence.
+             * @example 5
+             */
+            documentMaxMb: number;
+            /**
+             * @description `max_photo_upload_mb`.
+             * @example 10
+             */
+            photoMaxMb: number;
+            /**
+             * @description Evidence files each party may attach to a dispute (422 `DISPUTE_EVIDENCE_LIMIT`).
+             * @example 10
+             */
+            disputeEvidenceMax: number;
+            /**
+             * @description Maximum length of a message body, everywhere a message can be sent.
+             * @example 4000
+             */
+            messageMaxLength: number;
+            /**
+             * @description Slug of the default published academic-request form — open `{APP_PUBLIC_URL}/f/{slug}` in a WebView. Null while no form is published.
+             * @example event-request
+             */
+            eventRequestFormSlug: string | null;
+            /**
+             * @description MIME types accepted for documents — what the server sniffs from the bytes.
+             * @example [
+             *       "application/pdf",
+             *       "image/jpeg",
+             *       "image/png",
+             *       "image/webp",
+             *       "image/heic",
+             *       "image/heif"
+             *     ]
+             */
+            documentAcceptedMimeTypes: string[];
+            /**
+             * @description File extensions matching those MIME types — what a file picker filters on. Match pickers on these; the server still decides from the bytes.
+             * @example [
+             *       "pdf",
+             *       "jpg",
+             *       "jpeg",
+             *       "png",
+             *       "webp",
+             *       "heic",
+             *       "heif"
+             *     ]
+             */
+            documentAcceptedExtensions: string[];
+        };
+        AppConfigDto: {
+            /**
+             * @description Below this the app must ask the user to update.
+             * @example 1.0.0
+             */
+            minAppVersion: string;
+            /** @example false */
+            maintenanceMode: boolean;
+            /**
+             * @description In the caller’s language.
+             * @example Eventor is back at 18:00.
+             */
+            maintenanceMessage: string | null;
+            maintenanceMessageEn: string | null;
+            maintenanceMessageAr: string | null;
+            /**
+             * @example [
+             *       "en",
+             *       "ar"
+             *     ]
+             */
+            languages: string[];
+            /** @example en */
+            defaultLanguage: string;
+            /** @example DZD */
+            currency: string;
+            /**
+             * @description When false the server has no email yet: sign-up returns tokens directly (skip screen 10), and login/booking do not ask for a verified email.
+             * @example true
+             */
+            emailVerificationRequired: boolean;
+            /**
+             * Format: email
+             * @example support@eventor.dz
+             */
+            supportEmail: string | null;
+            /** @example +213555000000 */
+            supportPhone: string | null;
+            /** @example https://eventor.dz/terms */
+            termsUrl: string | null;
+            /** @example https://eventor.dz/privacy */
+            privacyUrl: string | null;
+            /**
+             * @description Upload limits, so the app can refuse a file before sending it.
+             * @example {
+             *       "maxPhotoMb": 8,
+             *       "maxDocumentMb": 5,
+             *       "maxPhotosPerService": 12,
+             *       "imageTypes": [
+             *         "jpeg",
+             *         "png",
+             *         "webp"
+             *       ]
+             *     }
+             */
+            uploads: Record<string, never>;
+            /** @description Business limits the app should enforce locally before the server refuses. */
+            limits: components["schemas"]["AppConfigLimitsDto"];
+            /**
+             * @example {
+             *       "minLength": 10,
+             *       "needsLetterAndDigit": true
+             *     }
+             */
+            passwordPolicy: Record<string, never>;
+            /**
+             * @example {
+             *       "minNoticeDays": 2,
+             *       "replyDeadlineHours": 48,
+             *       "cancellationWindowHours": 48
+             *     }
+             */
+            booking: Record<string, never>;
+        };
+        AppBookingLineDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @example service
+             * @enum {string}
+             */
+            kind: "service" | "extra" | "pack_service" | "discount" | "adjustment";
+            /** @example Wedding photo & video coverage */
+            label: string;
+            /** @example 1 */
+            quantity: number;
+            /** @example 45000.00 */
+            unitAmount: string;
+            /**
+             * @description Negative on a `discount` line.
+             * @example 45000.00
+             */
+            amount: string;
+        };
+        AppQuoteResultDto: {
+            /** @description Same lines the booking will carry; ids are empty on a quote. */
+            lines: components["schemas"]["AppBookingLineDto"][];
+            /** @example 57000.00 */
+            subtotal: string;
+            /** @example 0.00 */
+            discountTotal: string;
+            /** @example 57000.00 */
+            total: string;
+            /**
+             * @description Eventor’s fee percentage on this booking, **informational**: payment is cash between the two parties and the client pays `total`.
+             * @example 8.00
+             */
+            feePercent: string;
+            /**
+             * @description The provider is free that day and takes bookings.
+             * @example true
+             */
+            available: boolean;
+            /**
+             * @description Why the date is refused, when `available` is false: `DATE_UNAVAILABLE`, `MIN_NOTICE`, `PROVIDER_NOT_ACCEPTING`, `OUTSIDE_SERVICE_PERIOD`, `SERVICE_TIMES_REQUIRED`, `OUTSIDE_SERVICE_HOURS` or `SLOT_UNAVAILABLE` (the same codes `POST /app/bookings` answers).
+             * @example DATE_UNAVAILABLE
+             */
+            unavailableReason: string | null;
+            /**
+             * @description Today + `booking_min_notice_days` (Africa/Algiers).
+             * @example 2026-09-27
+             */
+            firstBookableDate: string;
+            /** @example 7 */
+            minNoticeDays: number;
+        };
+        AppBookingExtraDto: {
+            /**
+             * Format: uuid
+             * @description An `extras[].id` from `GET /app/services/{id}`.
+             */
+            extraId: string;
+            /** @example 1 */
+            quantity: number;
+        };
+        AppQuoteDto: {
+            /**
+             * Format: uuid
+             * @description Exactly one of `serviceId` / `packId`.
+             */
+            serviceId?: string;
+            /** Format: uuid */
+            packId?: string;
+            /**
+             * @description `YYYY-MM-DD`, Africa/Algiers.
+             * @example 2026-11-14
+             */
+            eventDate: string;
+            /**
+             * @description `HH:mm`, Africa/Algiers. Drives the quantity of a `per_hour` service.
+             * @example 18:00
+             */
+            startTime?: string;
+            /**
+             * @description `HH:mm`. Needs `startTime` and must differ from it (400 `VALIDATION_FAILED`, codes `REQUIRED_WITH_END` / `SAME_AS_START`). An end earlier than the start ends the next day: 18:00 → 02:00 is 8 h, and a `per_hour` service counts started hours across midnight.
+             * @example 23:00
+             */
+            endTime?: string;
+            /**
+             * @description Drives the quantity of a `per_person` service.
+             * @example 180
+             */
+            guests?: number;
+            /** @description Service bookings only; a pack refuses extras. */
+            extras?: components["schemas"]["AppBookingExtraDto"][];
+        };
+        AppBookingPartyDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Yasmine Khaled */
+            fullName: string;
+            avatarUrl: string | null;
+            /**
+             * @description Providers only.
+             * @example Studio Lumière
+             */
+            businessName: string | null;
+            /**
+             * @description Null until the booking is accepted (status-rules §10).
+             * @example +213551234567
+             */
+            phone: string | null;
+            /** @description Null until the booking is accepted; never filled for a provider. */
+            email: string | null;
+        };
+        AppBookingTimelineEntryDto: {
+            /**
+             * @description `created`, the booking status the entry moved to, or one of the milestones `rescheduled` / `checked_in` / `dispute_opened`.
+             * @example accepted
+             * @enum {string}
+             */
+            type: "created" | "pending" | "accepted" | "declined" | "cancelled" | "completed" | "rescheduled" | "checked_in" | "dispute_opened";
+            /** @enum {string|null} */
+            toStatus: "pending" | "accepted" | "declined" | "cancelled" | "completed" | null;
+            /** @example Yasmine K. */
+            actorLabel: string | null;
+            reason: string | null;
+            /** Format: date-time */
+            at: string;
+        };
+        AppRescheduleRowDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "pending" | "accepted" | "rejected" | "cancelled";
+            /** @example 2026-11-14 */
+            oldDate: string;
+            /** @example 2026-11-21 */
+            newDate: string;
+            /** @example 18:00 */
+            newStartTime: string | null;
+            /** @example 23:00 */
+            newEndTime: string | null;
+            /** @example The hall is only free the week after. */
+            reason: Record<string, never>;
+            /**
+             * @description Which side proposed it.
+             * @enum {string}
+             */
+            proposedByRole: "client" | "provider" | "admin";
+            /**
+             * @description True when it is this caller’s turn to accept or reject.
+             * @example true
+             */
+            awaitingMe: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppInvoiceSummaryDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example INV-000123 */
+            number: string;
+            /** @example 1 */
+            version: number;
+            /** @example 57000.00 */
+            total: string;
+            /** @example false */
+            voided: boolean;
+            /** @example /api/v1/app/bookings/…/invoice.pdf */
+            pdfPath: string;
+            /** Format: date-time */
+            issuedAt: string;
+        };
+        AppBookingDisputeSummaryDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example DSP-000012 */
+            reference: string;
+            /**
+             * @example open
+             * @enum {string}
+             */
+            status: "open" | "in_review" | "resolved" | "closed";
+            /**
+             * @example provider_no_show
+             * @enum {string}
+             */
+            type: "provider_no_show" | "client_no_show" | "service_not_as_described" | "incomplete_or_late" | "price_disagreement" | "cancellation_disagreement" | "damage_or_safety" | "behaviour" | "other";
+            /**
+             * @description True when this caller opened it.
+             * @example true
+             */
+            openedByMe: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppBookingDetailDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example EVT-000123 */
+            reference: string;
+            /** @enum {string} */
+            status: "pending" | "accepted" | "declined" | "cancelled" | "completed";
+            /** @enum {string} */
+            disputeStatus: "none" | "open" | "resolved";
+            /** @enum {string} */
+            eventType: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
+            /**
+             * @description Africa/Algiers, not a timestamp.
+             * @example 2026-11-14
+             */
+            eventDate: string;
+            /** @example 18:00 */
+            startTime: string | null;
+            /** @example 23:00 */
+            endTime: string | null;
+            /**
+             * @description The service or pack name, in the caller’s language.
+             * @example Wedding photo & video coverage
+             */
+            title: string;
+            /** @example Wedding photo & video coverage */
+            titleEn: string;
+            /** @example تغطية تصوير الأعراس */
+            titleAr: string;
+            /** Format: uuid */
+            serviceId: string | null;
+            /** Format: uuid */
+            packId: string | null;
+            /** @description The booked service’s category ("Photography · Sat 14 Mar"). Null for a pack booking — use `eventType` there. */
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            coverUrl: string | null;
+            wilaya: components["schemas"]["AppWilayaRefDto"] | null;
+            /** @example 180 */
+            guests: number | null;
+            /** @example 57000.00 */
+            total: string;
+            /** @description The provider for a client, the client for a provider. */
+            counterparty: components["schemas"]["AppBookingPartyDto"];
+            /**
+             * Format: uuid
+             * @description The direct chat, for the "Message" button.
+             */
+            conversationId: string | null;
+            /** @description The buttons to draw; the write endpoints enforce the same rules. */
+            allowedActions: ("cancel" | "accept" | "decline" | "complete" | "reschedule" | "respond_reschedule" | "check_in" | "review" | "dispute" | "message" | "invoice")[];
+            /** Format: date-time */
+            createdAt: string;
+            locationText: string | null;
+            /** @example Hydra */
+            communeName: string | null;
+            clientNote: string | null;
+            lines: components["schemas"]["AppBookingLineDto"][];
+            /** @example 57000.00 */
+            subtotal: string;
+            /** @example 0.00 */
+            discountTotal: string;
+            /**
+             * @description Informational: Eventor takes no money, payment is cash.
+             * @example 8.00
+             */
+            feePercent: string;
+            /** @description The service’s cancellation policy text, shown but never enforced (status-rules §3). */
+            cancellationPolicy: string | null;
+            cancelReason: string | null;
+            /** @enum {string|null} */
+            cancelledBy: "client" | "provider" | "admin" | null;
+            declineReason: string | null;
+            /** @description The provider card screen 12 draws; null on a pack whose provider was deleted. */
+            provider: components["schemas"]["AppProviderSummaryDto"] | null;
+            timeline: components["schemas"]["AppBookingTimelineEntryDto"][];
+            reschedules: components["schemas"]["AppRescheduleRowDto"][];
+            /** @description Issued when the booking is accepted; null before that. */
+            invoice: components["schemas"]["AppInvoiceSummaryDto"] | null;
+            dispute: components["schemas"]["AppBookingDisputeSummaryDto"] | null;
+            /**
+             * @description This caller tapped "All good".
+             * @example false
+             */
+            checkedIn: boolean;
+            /**
+             * @description The other party tapped "All good".
+             * @example false
+             */
+            otherCheckedIn: boolean;
+            /**
+             * Format: uuid
+             * @description The caller’s review of this booking, when there is one.
+             */
+            reviewId: string | null;
+            /**
+             * @description The review window (24 h → 60 days after completion) is open.
+             * @example false
+             */
+            reviewWindowOpen: boolean;
+            /**
+             * @description A dispute can be opened right now (status-rules §6).
+             * @example false
+             */
+            disputeWindowOpen: boolean;
+        };
+        AppCreateBookingDto: {
+            /**
+             * Format: uuid
+             * @description Exactly one of `serviceId` / `packId`.
+             */
+            serviceId?: string;
+            /** Format: uuid */
+            packId?: string;
+            /**
+             * @description `YYYY-MM-DD`, Africa/Algiers.
+             * @example 2026-11-14
+             */
+            eventDate: string;
+            /**
+             * @description `HH:mm`, Africa/Algiers. Drives the quantity of a `per_hour` service.
+             * @example 18:00
+             */
+            startTime?: string;
+            /**
+             * @description `HH:mm`. Needs `startTime` and must differ from it (400 `VALIDATION_FAILED`, codes `REQUIRED_WITH_END` / `SAME_AS_START`). An end earlier than the start ends the next day: 18:00 → 02:00 is 8 h, and a `per_hour` service counts started hours across midnight.
+             * @example 23:00
+             */
+            endTime?: string;
+            /**
+             * @description Drives the quantity of a `per_person` service.
+             * @example 180
+             */
+            guests?: number;
+            /** @description Service bookings only; a pack refuses extras. */
+            extras?: components["schemas"]["AppBookingExtraDto"][];
+            /**
+             * @description Wilaya code of the event.
+             * @example 16
+             */
+            wilayaCode: number;
+            /**
+             * Format: uuid
+             * @description Must belong to `wilayaCode`.
+             */
+            communeId?: string;
+            /** @example Salle des fêtes El Djazair, Hydra */
+            locationText?: string;
+            /**
+             * @example wedding
+             * @enum {string}
+             */
+            eventType: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
+            /** @example We would like the drone shots included. */
+            clientNote?: string;
+        };
+        AppBookingCardDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example EVT-000123 */
+            reference: string;
+            /** @enum {string} */
+            status: "pending" | "accepted" | "declined" | "cancelled" | "completed";
+            /** @enum {string} */
+            disputeStatus: "none" | "open" | "resolved";
+            /** @enum {string} */
+            eventType: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
+            /**
+             * @description Africa/Algiers, not a timestamp.
+             * @example 2026-11-14
+             */
+            eventDate: string;
+            /** @example 18:00 */
+            startTime: string | null;
+            /** @example 23:00 */
+            endTime: string | null;
+            /**
+             * @description The service or pack name, in the caller’s language.
+             * @example Wedding photo & video coverage
+             */
+            title: string;
+            /** @example Wedding photo & video coverage */
+            titleEn: string;
+            /** @example تغطية تصوير الأعراس */
+            titleAr: string;
+            /** Format: uuid */
+            serviceId: string | null;
+            /** Format: uuid */
+            packId: string | null;
+            /** @description The booked service’s category ("Photography · Sat 14 Mar"). Null for a pack booking — use `eventType` there. */
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            coverUrl: string | null;
+            wilaya: components["schemas"]["AppWilayaRefDto"] | null;
+            /** @example 180 */
+            guests: number | null;
+            /** @example 57000.00 */
+            total: string;
+            /** @description The provider for a client, the client for a provider. */
+            counterparty: components["schemas"]["AppBookingPartyDto"];
+            /**
+             * Format: uuid
+             * @description The direct chat, for the "Message" button.
+             */
+            conversationId: string | null;
+            /** @description The buttons to draw; the write endpoints enforce the same rules. */
+            allowedActions: ("cancel" | "accept" | "decline" | "complete" | "reschedule" | "respond_reschedule" | "check_in" | "review" | "dispute" | "message" | "invoice")[];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppCancelBookingDto: {
+            /** @example The venue changed our date. */
+            reason: string;
+        };
+        AppRescheduleDto: {
+            /** @example 2026-11-21 */
+            date: string;
+            /** @example 18:00 */
+            startTime?: string;
+            /**
+             * @description Same rules as `AppQuoteDto.endTime` (applied to the resulting start / end).
+             * @example 23:00
+             */
+            endTime?: string;
+            /** @example The hall is only free the week after. */
+            reason: string;
+        };
+        AppCheckInDto: {
+            /**
+             * @description `ok` is "All good" (status-rules §5); `problem` answers 422 and points at `POST /app/bookings/{id}/disputes`.
+             * @example ok
+             * @enum {string}
+             */
+            answer: "ok" | "problem";
+        };
+        AppVerificationStepDto: {
+            /** @enum {string} */
+            key: "account_created" | "documents_submitted" | "under_review" | "approved";
+            /** @example true */
+            done: boolean;
+            /**
+             * @description The step the spinner sits on; at most one is `current`.
+             * @example false
+             */
+            current: boolean;
+        };
+        AppProviderCountsDto: {
+            /**
+             * @description Pending booking requests.
+             * @example 3
+             */
+            requests: number;
+            /**
+             * @description Accepted bookings from today on.
+             * @example 5
+             */
+            upcoming: number;
+            /**
+             * @description Services that are not deleted.
+             * @example 7
+             */
+            services: number;
+            /** @example 2 */
+            unreadMessages: number;
+            /** @example 4 */
+            unreadNotifications: number;
+        };
+        AppProviderServiceRowDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Wedding photo & video coverage */
+            title: string;
+            /** @example Wedding photo & video coverage */
+            titleEn: string;
+            /** @example تغطية تصوير الأعراس */
+            titleAr: string;
+            /** @enum {string} */
+            status: "draft" | "published" | "hidden";
+            /**
+             * @description Visible in the app right now (published, provider verified, an open wilaya).
+             * @example true
+             */
+            visibleInApp: boolean;
+            /** @example 45000.00 */
+            basePrice: string;
+            /**
+             * @description So the row can print "45 000 DA · per day".
+             * @example per_day
+             * @enum {string}
+             */
+            priceType: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
+            /** @example 4.80 */
+            avgRating: string;
+            /** @example 32 */
+            ratingCount: number;
+            /** @example 12 */
+            bookingsCount: number;
+            /** @example 3 */
+            photosCount: number;
+            coverUrl: string | null;
+            wilayas: components["schemas"]["AppWilayaRefDto"][];
+        };
+        AppProviderHomeDto: {
+            /**
+             * @description `verified` draws screen 21 (the full home); `pending` and `rejected` draw 21a with `verificationSteps` and `documents`. `blocked` means an admin blocked the account: show a blocked state (use the `ACCOUNT_BLOCKED` details from sign-in for the message) — services and packs are hidden, chats are read-only and no request can be accepted until an admin unblocks the account.
+             * @enum {string}
+             */
+            state: "verified" | "pending" | "rejected" | "blocked";
+            /** @example Studio Lumière */
+            businessName: string;
+            avatarUrl: string | null;
+            /** @enum {string} */
+            verificationStatus: "not_required" | "pending" | "verified" | "rejected";
+            /** @description The "Profile under review" steps on screen 21a. */
+            verificationSteps: components["schemas"]["AppVerificationStepDto"][];
+            /** @description Only while the account is not verified — the same payload as `GET /app/me/documents`. */
+            documents: components["schemas"]["AppDocumentsDto"] | null;
+            /**
+             * @description The "Available for bookings" toggle.
+             * @example true
+             */
+            acceptingBookings: boolean;
+            /** @example 4.80 */
+            avgRating: string;
+            /** @example 32 */
+            ratingCount: number;
+            /** @example 48 */
+            completedBookingsCount: number;
+            counts: components["schemas"]["AppProviderCountsDto"];
+            /** @description The pending requests, newest first, with Accept / Decline in `allowedActions`. Empty while pending verification. */
+            requests: components["schemas"]["AppBookingCardDto"][];
+            /** @description The next accepted bookings. */
+            upcoming: components["schemas"]["AppBookingCardDto"][];
+            /** @description "Your services", with the availability each one has. */
+            services: components["schemas"]["AppProviderServiceRowDto"][];
+        };
+        AppUpdateProviderProfileDto: {
+            /** @example Studio Lumière */
+            businessName?: string;
+            /**
+             * Format: uuid
+             * @description Must be a visible category.
+             */
+            categoryId?: string;
+            bioEn?: string | null;
+            bioAr?: string | null;
+            /**
+             * @description Replaces the set; every added wilaya must be open.
+             * @example [
+             *       16,
+             *       9
+             *     ]
+             */
+            wilayaCodes?: number[];
+            /**
+             * @description Replaces the list ("العربية والفرنسية والإنجليزية" on screen 13).
+             * @example [
+             *       "ar",
+             *       "fr",
+             *       "en"
+             *     ]
+             */
+            languagesSpoken?: string[];
+            /** @example 8 */
+            yearsActive?: number | null;
+            /**
+             * @description The "Available for bookings" toggle on screen 21. Off keeps services visible and refuses new bookings.
+             * @example true
+             */
+            acceptingBookings?: boolean;
+        };
+        AppCreateServiceDto: {
+            /**
+             * @description May be empty in a draft; required to publish.
+             * @example تغطية زفاف بالصورة والفيديو
+             */
+            titleAr?: string;
+            /** @example Full-day photo and video coverage, from the preparations to the last dance. */
+            descriptionEn?: string;
+            /** @example تغطية كاملة بالصورة والفيديو من التحضيرات إلى آخر رقصة. */
+            descriptionAr?: string;
+            /** @example Free cancellation up to 30 days before the event. */
+            cancellationPolicyEn?: string | null;
+            /** @example إلغاء مجاني حتى 30 يومًا قبل المناسبة. */
+            cancellationPolicyAr?: string | null;
+            facts?: components["schemas"]["ServiceFactDto"][] | null;
+            /** @example 1 */
+            maxEventsPerDay?: number;
+            /** @example 400 */
+            maxGuests?: number | null;
+            /**
+             * @description Different clients who may book overlapping hours (default 1). Whole-day bookings only count against `maxEventsPerDay`.
+             * @example 1
+             */
+            concurrentClients?: number;
+            /**
+             * Format: date
+             * @description First event date it can be booked for; null = no limit.
+             * @example 2027-03-01
+             */
+            availableFrom?: string | null;
+            /**
+             * Format: date
+             * @description Last event date; the service leaves the catalog after it. Not before `availableFrom`.
+             * @example 2027-03-31
+             */
+            availableUntil?: string | null;
+            /** @description Replaces the set. Empty = bookable at any hour. Ranges of one weekday must not overlap. */
+            hours?: components["schemas"]["ServiceHourDto"][];
+            /**
+             * @description Replaces the set; added wilayas must be open.
+             * @example [
+             *       16,
+             *       9
+             *     ]
+             */
+            wilayaCodes?: number[];
+            /** @description Replaces the set, in this order. */
+            extras?: components["schemas"]["ServiceExtraInputDto"][];
+            /**
+             * Format: uuid
+             * @description Must be visible (422 CATEGORY_HIDDEN).
+             */
+            categoryId: string;
+            /** @example Wedding photo & video coverage */
+            titleEn: string;
+            /**
+             * @description DZD
+             * @example 45000.00
+             */
+            basePrice: string;
+            /** @enum {string} */
+            priceType: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
+        };
+        AppUpdateServiceDto: {
+            /**
+             * Format: uuid
+             * @description Must be visible when it changes.
+             */
+            categoryId?: string;
+            /** @example Wedding photo & video coverage */
+            titleEn?: string;
+            /**
+             * @description May be empty in a draft; required to publish.
+             * @example تغطية زفاف بالصورة والفيديو
+             */
+            titleAr?: string;
+            /** @example Full-day photo and video coverage, from the preparations to the last dance. */
+            descriptionEn?: string;
+            /** @example تغطية كاملة بالصورة والفيديو من التحضيرات إلى آخر رقصة. */
+            descriptionAr?: string;
+            /** @example Free cancellation up to 30 days before the event. */
+            cancellationPolicyEn?: string | null;
+            /** @example إلغاء مجاني حتى 30 يومًا قبل المناسبة. */
+            cancellationPolicyAr?: string | null;
+            facts?: components["schemas"]["ServiceFactDto"][] | null;
+            /**
+             * @description DZD
+             * @example 45000.00
+             */
+            basePrice?: string;
+            /** @enum {string} */
+            priceType?: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
+            /** @example 1 */
+            maxEventsPerDay?: number;
+            /** @example 400 */
+            maxGuests?: number | null;
+            /**
+             * @description Different clients who may book overlapping hours (default 1). Whole-day bookings only count against `maxEventsPerDay`.
+             * @example 1
+             */
+            concurrentClients?: number;
+            /**
+             * Format: date
+             * @description First event date it can be booked for; null = no limit.
+             * @example 2027-03-01
+             */
+            availableFrom?: string | null;
+            /**
+             * Format: date
+             * @description Last event date; the service leaves the catalog after it. Not before `availableFrom`.
+             * @example 2027-03-31
+             */
+            availableUntil?: string | null;
+            /** @description Replaces the set. Empty = bookable at any hour. Ranges of one weekday must not overlap. */
+            hours?: components["schemas"]["ServiceHourDto"][];
+            /**
+             * @description Replaces the set; added wilayas must be open.
+             * @example [
+             *       16,
+             *       9
+             *     ]
+             */
+            wilayaCodes?: number[];
+            /** @description Replaces the set, in this order. */
+            extras?: components["schemas"]["ServiceExtraInputDto"][];
+        };
+        AppPhotoOrderDto: {
+            /** @description Every photo id of the service or pack, in the new order. */
+            ids: string[];
+        };
+        AppCreatePackDto: {
+            /**
+             * @description May be empty in a draft.
+             * @example باقة الزفاف الأساسية
+             */
+            nameAr?: string;
+            descriptionEn?: string | null;
+            descriptionAr?: string | null;
+            /** @example 150 */
+            maxGuests?: number | null;
+            /** @example Essentiel Mariage */
+            nameEn: string;
+            /** @enum {string} */
+            eventType: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
+            /**
+             * @description Must be open.
+             * @example 9
+             */
+            wilayaCode: number;
+            /**
+             * @description DZD
+             * @example 380000.00
+             */
+            price: string;
+            /** @description Ordered services of the provider. */
+            serviceIds: string[];
+        };
+        AppUpdatePackDto: {
+            /** @example Essentiel Mariage */
+            nameEn?: string;
+            /**
+             * @description May be empty in a draft.
+             * @example باقة الزفاف الأساسية
+             */
+            nameAr?: string;
+            descriptionEn?: string | null;
+            descriptionAr?: string | null;
+            /** @enum {string} */
+            eventType?: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
+            /** @example 9 */
+            wilayaCode?: number;
+            /**
+             * @description DZD; must be below the sum of the items to publish.
+             * @example 380000.00
+             */
+            price?: string;
+            /** @example 150 */
+            maxGuests?: number | null;
+            /** @description Ordered; replaces the items. */
+            serviceIds?: string[];
+        };
+        AppCreateBlockDto: {
+            /**
+             * @description `YYYY-MM-DD`, today or later.
+             * @example 2026-11-21
+             */
+            date: string;
+            /**
+             * @description Send `startTime` and `endTime` together, or neither for the whole day.
+             * @example 14:00
+             */
+            startTime?: string;
+            /** @example 18:00 */
+            endTime?: string;
+            /**
+             * Format: uuid
+             * @description Block one of your services only; omit to block every service that day.
+             */
+            serviceId?: string;
+            /** @example Family wedding */
+            note?: string;
+        };
+        AppProviderReviewDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example 5 */
+            rating: number;
+            /**
+             * @description The redacted text when an admin redacted it.
+             * @example Wonderful team.
+             */
+            comment: string;
+            /**
+             * @description Never a full name (mobile-api §7).
+             * @example Yasmine K.
+             */
+            authorName: string;
+            authorAvatarUrl: string | null;
+            /** Format: uuid */
+            serviceId: string | null;
+            serviceTitle: string | null;
+            /** @example EVT-000123 */
+            bookingReference: string;
+            /**
+             * @description A label on the review (status-rules §6).
+             * @example false
+             */
+            hadDispute: boolean;
+            /** Format: uuid */
+            replyId: string | null;
+            reply: string | null;
+            /** Format: date-time */
+            repliedAt: string | null;
+            /**
+             * @description The reply can still be edited or deleted (48 h, status-rules §8).
+             * @example true
+             */
+            replyEditable: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppChatPersonDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description The business name for a provider, the full name for a client. Never an email or a phone.
+             * @example Studio Lumière
+             */
+            name: string;
+            avatarUrl: string | null;
+            /**
+             * @example provider
+             * @enum {string}
+             */
+            role: "client" | "provider" | "support";
+            /**
+             * @description The account is blocked, so the chat is read-only for them.
+             * @example false
+             */
+            blocked: boolean;
+        };
+        AppLastMessageDto: {
+            /**
+             * @description Already masked for you. Empty for an image without a caption — render "📷 Photo" from `kind`.
+             * @example See you on the 14th!
+             */
+            body: string;
+            /**
+             * @example text
+             * @enum {string}
+             */
+            kind: "text" | "attachment" | "system";
+            /**
+             * @description You wrote it — screen 14 prefixes "You: ".
+             * @example true
+             */
+            mine: boolean;
+        };
+        AppChatBookingDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example EVT-000123 */
+            reference: string;
+            /** @enum {string} */
+            status: "pending" | "accepted" | "declined" | "cancelled" | "completed";
+            /** @example 2026-11-14 */
+            eventDate: string;
+            /** @example Wedding photo & video coverage */
+            title: string;
+            /** @example 57000.00 */
+            total: string;
+        };
+        AppConversationRowDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "direct" | "support" | "dispute";
+            /** @enum {string} */
+            status: "open" | "closed";
+            /** @description The other participant (Eventor support on a support or dispute chat). */
+            other: components["schemas"]["AppChatPersonDto"] | null;
+            /** @description The newest message: its text (masked for you), its kind and whether you wrote it. */
+            lastMessage: components["schemas"]["AppLastMessageDto"] | null;
+            /** Format: date-time */
+            lastMessageAt: string | null;
+            /** @example 2 */
+            unreadCount: number;
+            booking: components["schemas"]["AppChatBookingDto"] | null;
+            /**
+             * @description You may write here (open chat, account not blocked).
+             * @example true
+             */
+            canWrite: boolean;
+        };
+        AppConversationDetailDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "direct" | "support" | "dispute";
+            /** @enum {string} */
+            status: "open" | "closed";
+            /** @description The other participant (Eventor support on a support or dispute chat). */
+            other: components["schemas"]["AppChatPersonDto"] | null;
+            /** @description The newest message: its text (masked for you), its kind and whether you wrote it. */
+            lastMessage: components["schemas"]["AppLastMessageDto"] | null;
+            /** Format: date-time */
+            lastMessageAt: string | null;
+            /** @example 2 */
+            unreadCount: number;
+            booking: components["schemas"]["AppChatBookingDto"] | null;
+            /**
+             * @description You may write here (open chat, account not blocked).
+             * @example true
+             */
+            canWrite: boolean;
+            participants: components["schemas"]["AppChatPersonDto"][];
+            /**
+             * @description True once the pair share an accepted or completed booking: contact details stop being masked from then on (status-rules §10).
+             * @example false
+             */
+            contactUnmasked: boolean;
+            /**
+             * Format: uuid
+             * @description The dispute this chat belongs to, when it is a dispute chat.
+             */
+            disputeId: string | null;
+            /**
+             * @description True when Eventor closed this conversation. The moderation reason itself is internal and never sent to the app — show your own localised "This conversation was closed by Eventor" line.
+             * @example false
+             */
+            closedByModeration: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppMessageDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            conversationId: string;
+            /** @enum {string} */
+            kind: "text" | "attachment" | "system";
+            /**
+             * Format: uuid
+             * @description Null for a system message.
+             */
+            senderId: string | null;
+            /**
+             * @description You wrote it.
+             * @example true
+             */
+            mine: boolean;
+            /**
+             * @description Already masked when masking applies — the original text is never sent to a participant.
+             * @example Call me on [phone hidden]
+             */
+            body: string;
+            /**
+             * @description Contact details were hidden in this message (status-rules §10).
+             * @example false
+             */
+            masked: boolean;
+            /**
+             * @description An admin removed this message: `body` is already replaced with `[removed by Eventor]` — render it as a removed bubble, do not match on the text.
+             * @example false
+             */
+            removed: boolean;
+            /** @description Signed URL of the image, for an `attachment` message. */
+            imageUrl: string | null;
+            /** @description Full-size signed URL of the image. */
+            imageLargeUrl: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppMessagesPageDto: {
+            /** @description Oldest first, so the list appends at the bottom. */
+            data: components["schemas"]["AppMessageDto"][];
+            /**
+             * @example {
+             *       "limit": 30,
+             *       "hasMore": true,
+             *       "nextBefore": "…"
+             *     }
+             */
+            meta: Record<string, never>;
+        };
+        AppStartConversationDto: {
+            /**
+             * Format: uuid
+             * @description The other person: a client writes to a provider and the other way round. One direct conversation exists per pair, so this is idempotent.
+             */
+            userId: string;
+            /**
+             * Format: uuid
+             * @description Attach the chat to one of your shared bookings (the context card on screen 15).
+             */
+            bookingId?: string;
+            /**
+             * @description The limit is `limits.messageMaxLength` from `GET /app/config`.
+             * @example Hello, are you free on 14 November?
+             */
+            body: string;
+        };
+        AppStartSupportConversationDto: {
+            /**
+             * @description The first message of the support thread.
+             * @example Hello, I cannot open my invoice.
+             */
+            body: string;
+        };
+        AppReadResultDto: {
+            /** Format: uuid */
+            conversationId: string;
+            /** @example 0 */
+            unreadCount: number;
+            /** Format: date-time */
+            lastReadAt: string | null;
+        };
+        AppReportResultDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description False when you had already reported this item and the open report was reused (status-rules §9).
+             * @example true
+             */
+            created: boolean;
+        };
+        AppReportMessageDto: {
+            /**
+             * @example contact_outside
+             * @enum {string}
+             */
+            reason: "inappropriate" | "spam" | "contact_outside" | "harassment" | "fake" | "other";
+            note?: string | null;
+        };
+        AppReportDto: {
+            /**
+             * @example service
+             * @enum {string}
+             */
+            targetType: "service" | "pack" | "user" | "review" | "message";
+            /** Format: uuid */
+            targetId: string;
+            /**
+             * @example inappropriate
+             * @enum {string}
+             */
+            reason: "inappropriate" | "spam" | "contact_outside" | "harassment" | "fake" | "other";
+            note?: string | null;
+        };
+        AppMyReviewDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            bookingId: string;
+            /** @example EVT-000123 */
+            bookingReference: string;
+            /** @example 5 */
+            rating: number;
+            /** @example Wonderful team. */
+            comment: string;
+            /** Format: uuid */
+            serviceId: string | null;
+            serviceTitle: string | null;
+            /** @example Studio Lumière */
+            providerName: string;
+            /**
+             * @description A review an admin hid or redacted keeps its row and says so here.
+             * @example published
+             * @enum {string}
+             */
+            status: "published" | "hidden" | "redacted";
+            /** @example Thank you Yasmine! */
+            reply: string | null;
+            /**
+             * @description Still inside the 48-hour edit window (status-rules §8).
+             * @example true
+             */
+            editable: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppCreateReviewDto: {
+            /** @example 5 */
+            rating: number;
+            /**
+             * @description Scanned for phone numbers, emails, links and insults; a flagged comment is still published and opens an automatic report (status-rules §8).
+             * @example Wonderful team, the photos arrived in two weeks.
+             */
+            comment: string;
+        };
+        AppEditReviewDto: {
+            /** @example 4 */
+            rating?: number;
+            /** @example Updated: the album arrived after all. */
+            comment?: string;
+        };
+        AppReviewReplyDto: {
+            /** @example Thank you Yasmine, it was a pleasure! */
+            body: string;
+        };
+        AppDisputeEvidenceRowDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @example file
+             * @enum {string}
+             */
+            kind: "file" | "chat_snapshot" | "note";
+            /** @description Signed URL; evidence is private to the parties and admins. */
+            url: string | null;
+            note: string | null;
+            /**
+             * @description You uploaded it.
+             * @example true
+             */
+            mine: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppDisputeDetailDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example DSP-000012 */
+            reference: string;
+            /** @enum {string} */
+            status: "open" | "in_review" | "resolved" | "closed";
+            /** @enum {string} */
+            type: "provider_no_show" | "client_no_show" | "service_not_as_described" | "incomplete_or_late" | "price_disagreement" | "cancellation_disagreement" | "damage_or_safety" | "behaviour" | "other";
+            /** Format: uuid */
+            bookingId: string;
+            /** @example EVT-000123 */
+            bookingReference: string;
+            /** @example 2026-11-14 */
+            eventDate: string;
+            /** @example Wedding photo & video coverage */
+            title: string;
+            /** @enum {string} */
+            openedByRole: "client" | "provider";
+            /**
+             * @description You opened it, so you may withdraw it while it is open.
+             * @example true
+             */
+            openedByMe: boolean;
+            /**
+             * Format: uuid
+             * @description The dispute chat: client + provider + Eventor.
+             */
+            conversationId: string | null;
+            /** @example 2 */
+            evidenceCount: number;
+            /** @description The admin’s decision note once the dispute is resolved or closed. */
+            decisionNote: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @example The photographer never came… */
+            description: string;
+            evidence: components["schemas"]["AppDisputeEvidenceRowDto"][];
+            /**
+             * @description `max_dispute_evidence_files`: how many files **you** may attach in total.
+             * @example 10
+             */
+            evidenceMax: number;
+            /**
+             * @description The dispute is open or in review, so you can still write and add evidence.
+             * @example true
+             */
+            active: boolean;
+            /** Format: date-time */
+            resolvedAt: string | null;
+        };
+        AppOpenDisputeDto: {
+            /**
+             * @example provider_no_show
+             * @enum {string}
+             */
+            type: "provider_no_show" | "client_no_show" | "service_not_as_described" | "incomplete_or_late" | "price_disagreement" | "cancellation_disagreement" | "damage_or_safety" | "behaviour" | "other";
+            /** @example The photographer never came to the wedding and did not answer our calls that evening. */
+            description: string;
+            /** @description Files you already uploaded (evidence or chat images), at most `max_dispute_evidence_files`. */
+            evidenceFileIds?: string[];
+        };
+        AppDisputeRowDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example DSP-000012 */
+            reference: string;
+            /** @enum {string} */
+            status: "open" | "in_review" | "resolved" | "closed";
+            /** @enum {string} */
+            type: "provider_no_show" | "client_no_show" | "service_not_as_described" | "incomplete_or_late" | "price_disagreement" | "cancellation_disagreement" | "damage_or_safety" | "behaviour" | "other";
+            /** Format: uuid */
+            bookingId: string;
+            /** @example EVT-000123 */
+            bookingReference: string;
+            /** @example 2026-11-14 */
+            eventDate: string;
+            /** @example Wedding photo & video coverage */
+            title: string;
+            /** @enum {string} */
+            openedByRole: "client" | "provider";
+            /**
+             * @description You opened it, so you may withdraw it while it is open.
+             * @example true
+             */
+            openedByMe: boolean;
+            /**
+             * Format: uuid
+             * @description The dispute chat: client + provider + Eventor.
+             */
+            conversationId: string | null;
+            /** @example 2 */
+            evidenceCount: number;
+            /** @description The admin’s decision note once the dispute is resolved or closed. */
+            decisionNote: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AppDisputeMessageDto: {
+            /**
+             * @description The limit is `limits.messageMaxLength` from `GET /app/config`.
+             * @example Here is the call log from that evening.
+             */
+            body: string;
+        };
+        AppWithdrawDisputeDto: {
+            /** @example We settled it directly with the provider. */
+            note: string;
         };
     };
     responses: never;
@@ -8460,7 +13696,7 @@ export interface operations {
             /**
              * @description `ACCOUNT_BLOCKED`: This account is blocked (sessions revoked).
              *
-             *     `AUTH_REFRESH_INVALID`: Your session is no longer valid. Please sign in again.
+             *     `AUTH_REFRESH_INVALID`: Your session is no longer valid. Please sign in again.<br>`AUTH_SESSION_REPLACED`: You were signed out because this account signed in on another computer.
              */
             401: {
                 headers: {
@@ -8984,6 +14220,27 @@ export interface operations {
             };
         };
     };
+    HealthController_root: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveResponseDto"];
+                };
+            };
+        };
+    };
     HealthController_live: {
         parameters: {
             query?: never;
@@ -9149,6 +14406,141 @@ export interface operations {
             };
             /** @description `CURRENT_PASSWORD_INVALID`: The current password is incorrect. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AdminMeController_uploadAvatar: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AdminMeDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FORBIDDEN_ROLE`: Your account role cannot access this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TOO_LARGE`: The file is larger than {maxMb} MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TYPE_NOT_ALLOWED`: This file type is not allowed. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AdminMeController_removeAvatar: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AdminMeDto"];
+                    };
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FORBIDDEN_ROLE`: Your account role cannot access this. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9450,6 +14842,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
         };
     };
     AdminAdminsController_resend: {
@@ -9500,6 +14901,15 @@ export interface operations {
             };
             /** @description `INVITATION_NOT_FOUND`: The invitation was not found. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11907,6 +17317,176 @@ export interface operations {
             };
         };
     };
+    AdminUsersController_replaceAvatar: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["UserDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FORBIDDEN_ROLE`: Your account role cannot access this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `USER_NOT_FOUND`: The user was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TOO_LARGE`: The file is larger than {maxMb} MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TYPE_NOT_ALLOWED`: This file type is not allowed. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AdminUsersController_removeAvatar: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveAvatarDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["UserDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FORBIDDEN_ROLE`: Your account role cannot access this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `USER_NOT_FOUND`: The user was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     AdminUsersController_unblock: {
         parameters: {
             query?: never;
@@ -12448,7 +18028,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `DATE_UNAVAILABLE`: The provider is not available on {date}. */
+            /** @description `DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`SLOT_UNAVAILABLE`: These hours are already booked on {date}. Choose other times. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -12457,7 +18037,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `NOT_A_CLIENT`: Bookings can only be made for client accounts.<br>`SERVICE_UNAVAILABLE_FOR_BOOKING`: This service cannot be booked: it is not visible in the app.<br>`PACK_UNAVAILABLE`: This pack cannot be booked: it is not visible in the app.<br>`PROVIDER_NOT_ACCEPTING`: The provider is not accepting bookings.<br>`MIN_NOTICE`: The event date must be on or after {minDate}.<br>`BOOKING_EXTRA_INVALID`: Some extras do not belong to this service.<br>`COMMUNE_WILAYA_MISMATCH`: The commune is not in this wilaya. */
+            /** @description `NOT_A_CLIENT`: Bookings can only be made for client accounts.<br>`SERVICE_UNAVAILABLE_FOR_BOOKING`: This service cannot be booked: it is not visible in the app.<br>`PACK_UNAVAILABLE`: This pack cannot be booked: it is not visible in the app.<br>`PROVIDER_NOT_ACCEPTING`: The provider is not accepting bookings.<br>`MIN_NOTICE`: The event date must be on or after {minDate}.<br>`BOOKING_EXTRA_INVALID`: Some extras do not belong to this service.<br>`COMMUNE_WILAYA_MISMATCH`: The commune is not in this wilaya.<br>`OUTSIDE_SERVICE_PERIOD`: This service can only be booked for events in its availability period.<br>`SERVICE_TIMES_REQUIRED`: Choose a start and end time: this service is booked by the hour.<br>`OUTSIDE_SERVICE_HOURS`: This service is not available at these hours on that day. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -12764,7 +18344,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}.<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`RESCHEDULE_PENDING_EXISTS`: A new date is already waiting for confirmation. Cancel it first. */
+            /** @description `BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}.<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`SLOT_UNAVAILABLE`: These hours are already booked on {date}. Choose other times.<br>`RESCHEDULE_PENDING_EXISTS`: A new date is already waiting for confirmation. Cancel it first. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -12773,7 +18353,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `BOOKING_DATE_PAST`: The date is in the past. */
+            /** @description `BOOKING_DATE_PAST`: The date is in the past.<br>`OUTSIDE_SERVICE_PERIOD`: This service can only be booked for events in its availability period.<br>`SERVICE_TIMES_REQUIRED`: Choose a start and end time: this service is booked by the hour.<br>`OUTSIDE_SERVICE_HOURS`: This service is not available at these hours on that day. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -20423,6 +26003,8430 @@ export interface operations {
             };
             /** @description `FORBIDDEN_ROLE`: Your account role cannot access this. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_register: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppRegisterDto"];
+            };
+        };
+        responses: {
+            /** @description Account created; the code is on its way. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppRegisterResultDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CATEGORY_NOT_FOUND`: The category was not found.<br>`WILAYA_NOT_FOUND`: The wilaya was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `EMAIL_TAKEN`: This email is already used by another account.<br>`PHONE_TAKEN`: This phone number is already used by another account. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password.<br>`PROVIDER_FIELDS_REQUIRED`: A provider account needs a business name and a category.<br>`PROVIDER_FIELDS_NOT_ALLOWED`: These fields belong to provider accounts only. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_verifyEmail: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppVerifyEmailDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppSessionDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `ACCOUNT_BLOCKED`: This account is blocked.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CODE_INVALID`: The verification code is incorrect.<br>`CODE_EXPIRED`: The verification code has expired. Ask for a new one. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_resend: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppResendCodeDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppCodeSentDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CODE_RESEND_TOO_SOON`: A code was just sent. Try again in {retryAfterSeconds} seconds.<br>`RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_login: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppLoginDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppSessionDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `INVALID_CREDENTIALS`: The email or password is incorrect. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `EMAIL_NOT_VERIFIED`: Verify your email address before signing in.<br>`ACCOUNT_BLOCKED`: This account is blocked.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `ACCOUNT_LOCKED`: Too many failed attempts. Try again in {retryAfterSeconds} seconds.<br>`RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_refresh: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppRefreshDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppSessionDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `ACCOUNT_BLOCKED`: this account is blocked (every session is revoked).
+             *
+             *     `AUTH_REFRESH_INVALID`: Your session is no longer valid. Please sign in again.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_logout: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppLogoutDto"];
+            };
+        };
+        responses: {
+            /** @description Signed out. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_forgot: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppForgotPasswordDto"];
+            };
+        };
+        responses: {
+            /** @description Accepted (says nothing about whether the account exists). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_verifyReset: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppVerifyResetCodeDto"];
+            };
+        };
+        responses: {
+            /** @description The code is valid and still usable. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CODE_INVALID`: The verification code is incorrect.<br>`CODE_EXPIRED`: The verification code has expired. Ask for a new one. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_reset: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppResetPasswordDto"];
+            };
+        };
+        responses: {
+            /** @description Password changed; sign in again. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `ACCOUNT_BLOCKED`: This account is blocked.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CODE_INVALID`: The verification code is incorrect.<br>`CODE_EXPIRED`: The verification code has expired. Ask for a new one.<br>`PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_setPassword: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppSetPasswordDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppSessionDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid.<br>`RESET_TOKEN_INVALID`: This password reset link is invalid or has already been used. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `ACCOUNT_BLOCKED`: This account is blocked.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RESET_TOKEN_EXPIRED`: This password reset link has expired. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_profile: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppMeDto"];
+                    };
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_remove: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteAppMeDto"];
+            };
+        };
+        responses: {
+            /** @description Account closed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `USER_NOT_FOUND`: The user was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `ACCOUNT_HAS_ACTIVE_ITEMS`: This account has {upcomingBookings} accepted upcoming bookings and {openDisputes} open disputes. Resolve them first. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CURRENT_PASSWORD_INVALID`: The current password is incorrect. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_update: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAppMeDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppMeDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `WILAYA_NOT_FOUND`: The wilaya was not found.<br>`FILE_NOT_FOUND`: The file was not found.<br>`USER_NOT_FOUND`: The user was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PHONE_TAKEN`: This phone number is already used by another account. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_changePassword: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppChangePasswordDto"];
+            };
+        };
+        responses: {
+            /** @description Password changed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CURRENT_PASSWORD_INVALID`: The current password is incorrect.<br>`PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_avatar: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppMeDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TOO_LARGE`: The file is larger than {maxMb} MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TYPE_NOT_ALLOWED`: This file type is not allowed. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_sessions: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppSessionRowDto"][];
+                    };
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_revokeOtherSessions: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["RevokedSessionsDto"];
+                    };
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_revokeSession: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session revoked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SESSION_NOT_FOUND`: The session was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_documents: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppDocumentsDto"];
+                    };
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `USER_NOT_FOUND`: The user was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_uploadDocument: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** @enum {string} */
+                    type: "national_id" | "commercial_register_or_artisan_card" | "tax_card";
+                    /**
+                     * Format: binary
+                     * @description PDF or image, at most `max_document_upload_mb` (5 MB).
+                     */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The new version is stored; the whole document list comes back. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppDocumentsDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TOO_LARGE`: The file is larger than {maxMb} MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TYPE_NOT_ALLOWED`: This file type is not allowed. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_registerDevice: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterDeviceTokenDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppDeviceTokenDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_removeDevice: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                /** @description The FCM token, URL-encoded. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Device removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `DEVICE_TOKEN_NOT_FOUND`: This device token is not registered. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_notificationPreferences: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppNotificationPreferencesDto"];
+                    };
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_updateNotificationPreferences: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNotificationPreferencesDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppNotificationPreferencesDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_notifications: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+                /** @description Only unread notifications. */
+                unread?: boolean;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppNotificationDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_unreadCount: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["UnreadCountDto"];
+                    };
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_markRead: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkNotificationsReadDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["MarkedReadDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_deleteNotification: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOTIFICATION_NOT_FOUND`: This notification was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_listFavourites: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+                /** @description Category chip on screen 17. Packs are excluded when set. */
+                categoryId?: string;
+                kind?: "service" | "pack";
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppFavouriteDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_addFavourite: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFavouriteDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppFavouriteDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found.<br>`PACK_NOT_FOUND`: The pack was not found.<br>`FAVOURITE_NOT_FOUND`: This favourite was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FAVOURITE_TARGET_INVALID`: Send exactly one of serviceId or packId. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_removeFavouriteByTarget: {
+        parameters: {
+            query?: {
+                /** @description Exactly one of `serviceId` / `packId` (422 FAVOURITE_TARGET_INVALID). */
+                serviceId?: string;
+                packId?: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not a favourite any more (whether or not it was one). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FAVOURITE_TARGET_INVALID`: Send exactly one of serviceId or packId. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_removeFavourite: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                /** @description The `id` of the favourite row. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FAVOURITE_NOT_FOUND`: This favourite was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_getBudget: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBudgetDto"];
+                    };
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BUDGET_NOT_FOUND`: You have not created a budget yet. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_putBudget: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutBudgetDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBudgetDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_deleteBudget: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BUDGET_NOT_FOUND`: You have not created a budget yet. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_addBudgetItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBudgetItemDto"];
+            };
+        };
+        responses: {
+            /** @description The whole budget, recomputed. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBudgetDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BUDGET_NOT_FOUND`: You have not created a budget yet.<br>`CATEGORY_NOT_FOUND`: The category was not found.<br>`BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BUDGET_BOOKING_ALREADY_LINKED`: This booking is already linked to another budget line. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BUDGET_ITEM_LIMIT`: A budget cannot hold more than {max} lines. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_removeBudgetItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBudgetDto"];
+                    };
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BUDGET_NOT_FOUND`: You have not created a budget yet.<br>`BUDGET_ITEM_NOT_FOUND`: This budget line was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_updateBudgetItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBudgetItemDto"];
+            };
+        };
+        responses: {
+            /** @description The whole budget, recomputed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBudgetDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BUDGET_NOT_FOUND`: You have not created a budget yet.<br>`BUDGET_ITEM_NOT_FOUND`: This budget line was not found.<br>`CATEGORY_NOT_FOUND`: The category was not found.<br>`BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BUDGET_BOOKING_ALREADY_LINKED`: This booking is already linked to another budget line. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAcademicController_list: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppAcademicRequestRowDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAcademicController_detail: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppAcademicRequestDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `ACADEMIC_REQUEST_NOT_FOUND`: The academic request was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_home: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppHomeDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FORBIDDEN_AUDIENCE`: This token belongs to another application. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `USER_NOT_FOUND`: The user was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_categories: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppCategoryDto"][];
+                    };
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_wilayas: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppWilayaListDto"][];
+                    };
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_communes: {
+        parameters: {
+            query?: {
+                /** @description Filter on the commune name (EN or AR) or postal code. */
+                q?: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                /** @description Wilaya code (1–58). */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppCommuneDto"][];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `WILAYA_NOT_FOUND`: The wilaya was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_services: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+                /** @description Free text over service titles and provider names. */
+                q?: string;
+                /** @description Category chip (screen 11). Repeat the parameter to search several categories at once, like `wilaya`. */
+                categoryId?: string[];
+                /** @description Repeat for several wilayas. */
+                wilaya?: number[];
+                /** @description DZD. */
+                priceMin?: number;
+                priceMax?: number;
+                /** @description Minimum average rating. */
+                rating?: number;
+                /** @description Keep only services free on that day. */
+                eventDate?: string;
+                /** @description Matches the categories used by packs of that event type. */
+                eventType?: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
+                /** @description Only services I marked as favourite (needs a token). */
+                favourite?: boolean;
+                /** @description `relevance` (search score, then rating), `price_asc`, `price_desc`, `rating`, `popular`, `newest`. */
+                order?: "relevance" | "price_asc" | "price_desc" | "rating" | "popular" | "newest";
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppServiceCardDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_service: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppServiceDetailDto"];
+                    };
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_serviceAvailability: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM` (400 MONTH_INVALID otherwise). */
+                month: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppAvailabilityDto"];
+                    };
+                };
+            };
+            /** @description `MONTH_INVALID`: The month must look like YYYY-MM.<br>`VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_serviceReviews: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+                /** @description Only reviews with this star rating. */
+                rating?: number;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppReviewDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_provider: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppProviderDetailDto"];
+                    };
+                };
+            };
+            /** @description `PROVIDER_NOT_FOUND`: This provider was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_providerReviews: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+                /** @description Only reviews with this star rating. */
+                rating?: number;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppReviewDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PROVIDER_NOT_FOUND`: This provider was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_packs: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+                /** @description Event-type tab (screen 19). */
+                eventType?: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
+                wilaya?: number[];
+                priceMax?: number;
+                /** @description Only packs led by this provider. */
+                providerId?: string;
+                order?: "savings" | "price_asc" | "price_desc" | "rating" | "popular";
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppPackCardDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_pack: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppPackDetailDto"];
+                    };
+                };
+            };
+            /** @description `PACK_NOT_FOUND`: The pack was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_packAvailability: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM` (400 MONTH_INVALID otherwise). */
+                month: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppAvailabilityDto"];
+                    };
+                };
+            };
+            /** @description `MONTH_INVALID`: The month must look like YYYY-MM.<br>`VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_NOT_FOUND`: The pack was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppCatalogController_track: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackEventDto"];
+            };
+        };
+        responses: {
+            /** @description Accepted and discarded (V1). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppConfigController_config: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description `en` or `ar`: picks `maintenanceMessage`. */
+                "Accept-Language"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppConfigDto"];
+                    };
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_quote: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppQuoteDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppQuoteResultDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found.<br>`PACK_NOT_FOUND`: The pack was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_EXTRA_INVALID`: Some extras do not belong to this service. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_list: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+                tab?: "upcoming" | "pending" | "past" | "cancelled";
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingCardDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_create: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+                /** @description `android` (default), `ios` or `web`. */
+                "X-Platform"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppCreateBookingDto"];
+            };
+        };
+        responses: {
+            /** @description The new pending booking. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `EMAIL_NOT_VERIFIED`: Verify your email address before signing in. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found.<br>`PACK_NOT_FOUND`: The pack was not found.<br>`WILAYA_NOT_FOUND`: The wilaya was not found.<br>`COMMUNE_NOT_FOUND`: The commune was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`BOOKING_DUPLICATE`: You already have booking {reference} for this on {date} at the same time. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_UNAVAILABLE_FOR_BOOKING`: This service cannot be booked: it is not visible in the app.<br>`PACK_UNAVAILABLE`: This pack cannot be booked: it is not visible in the app.<br>`PROVIDER_NOT_ACCEPTING`: The provider is not accepting bookings.<br>`MIN_NOTICE`: The event date must be on or after {minDate}.<br>`BOOKING_EXTRA_INVALID`: Some extras do not belong to this service.<br>`COMMUNE_WILAYA_MISMATCH`: The commune is not in this wilaya. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_detail: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_cancel: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppCancelBookingDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}". */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_reschedule: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppRescheduleDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}.<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`SLOT_UNAVAILABLE`: These hours are already booked on {date}. Choose other times.<br>`RESCHEDULE_PENDING_EXISTS`: A new date is already waiting for confirmation. Cancel it first. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_DATE_PAST`: The date is in the past.<br>`OUTSIDE_SERVICE_PERIOD`: This service can only be booked for events in its availability period.<br>`SERVICE_TIMES_REQUIRED`: Choose a start and end time: this service is booked by the hour.<br>`OUTSIDE_SERVICE_HOURS`: This service is not available at these hours on that day. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_acceptReschedule: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+                rid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found.<br>`RESCHEDULE_NOT_FOUND`: The reschedule proposal was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}.<br>`BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}.<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`SLOT_UNAVAILABLE`: These hours are already booked on {date}. Choose other times. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `OUTSIDE_SERVICE_PERIOD`: This service can only be booked for events in its availability period.<br>`SERVICE_TIMES_REQUIRED`: Choose a start and end time: this service is booked by the hour.<br>`OUTSIDE_SERVICE_HOURS`: This service is not available at these hours on that day. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_rejectReschedule: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+                rid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found.<br>`RESCHEDULE_NOT_FOUND`: The reschedule proposal was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}.<br>`BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_withdrawReschedule: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+                rid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found.<br>`RESCHEDULE_NOT_FOUND`: The reschedule proposal was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_checkIn: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppCheckInDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CHECK_IN_NOT_ALLOWED`: This booking cannot be confirmed in its current state.<br>`CHECK_IN_DISPUTED`: A problem is already open on this booking. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CHECK_IN_TOO_EARLY`: You can confirm once the event has taken place. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_invoice: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InvoiceDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found.<br>`INVOICE_NOT_FOUND`: This booking has no invoice. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppBookingsController_invoicePdf: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF bytes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found.<br>`INVOICE_NOT_FOUND`: This booking has no invoice. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_home: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppProviderHomeDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `USER_NOT_FOUND`: The user was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_updateProfile: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppUpdateProviderProfileDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppMeDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CATEGORY_NOT_FOUND`: The category was not found.<br>`WILAYA_NOT_FOUND`: The wilaya was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CATEGORY_HIDDEN`: This category is hidden and cannot be chosen for a service.<br>`WILAYA_CLOSED`: Some wilayas are closed: {closed}.<br>`NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_listBookings: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+                tab?: "requests" | "upcoming" | "past" | "cancelled";
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingCardDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_booking: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_accept: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}".<br>`DATE_UNAVAILABLE`: The provider is not available on {date}. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PROVIDER_NOT_VERIFIED`: Your profile is still being reviewed. You can publish and accept bookings once it is approved. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_decline: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppCancelBookingDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}". */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_cancel: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppCancelBookingDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}". */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_complete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}". */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_reschedule: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppRescheduleDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}.<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`SLOT_UNAVAILABLE`: These hours are already booked on {date}. Choose other times.<br>`RESCHEDULE_PENDING_EXISTS`: A new date is already waiting for confirmation. Cancel it first. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_DATE_PAST`: The date is in the past.<br>`OUTSIDE_SERVICE_PERIOD`: This service can only be booked for events in its availability period.<br>`SERVICE_TIMES_REQUIRED`: Choose a start and end time: this service is booked by the hour.<br>`OUTSIDE_SERVICE_HOURS`: This service is not available at these hours on that day. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_acceptReschedule: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+                rid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found.<br>`RESCHEDULE_NOT_FOUND`: The reschedule proposal was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}.<br>`BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}.<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`SLOT_UNAVAILABLE`: These hours are already booked on {date}. Choose other times. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `OUTSIDE_SERVICE_PERIOD`: This service can only be booked for events in its availability period.<br>`SERVICE_TIMES_REQUIRED`: Choose a start and end time: this service is booked by the hour.<br>`OUTSIDE_SERVICE_HOURS`: This service is not available at these hours on that day. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_rejectReschedule: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+                rid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found.<br>`RESCHEDULE_NOT_FOUND`: The reschedule proposal was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}.<br>`BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_withdrawReschedule: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+                rid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found.<br>`RESCHEDULE_NOT_FOUND`: The reschedule proposal was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_invoice: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InvoiceDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found.<br>`INVOICE_NOT_FOUND`: This booking has no invoice. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_invoicePdf: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF bytes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found.<br>`INVOICE_NOT_FOUND`: This booking has no invoice. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_checkIn: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppCheckInDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBookingDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CHECK_IN_NOT_ALLOWED`: This booking cannot be confirmed in its current state.<br>`CHECK_IN_DISPUTED`: A problem is already open on this booking. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CHECK_IN_TOO_EARLY`: You can confirm once the event has taken place. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_listServices: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppProviderServiceRowDto"][];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_createService: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppCreateServiceDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ServiceDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CATEGORY_NOT_FOUND`: The category was not found.<br>`WILAYA_NOT_FOUND`: The wilaya was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CATEGORY_HIDDEN`: This category is hidden and cannot be chosen for a service.<br>`WILAYA_CLOSED`: Some wilayas are closed: {closed}.<br>`NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_getService: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ServiceDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_deleteService: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The deleted service’s id and what it affected. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_HAS_BOOKINGS`: This service has {upcomingBookings} accepted upcoming bookings.<br>`SERVICE_IN_PACKS`: This service is part of {packsCount} packs of its provider; remove it from them before moving it to another provider. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_updateService: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppUpdateServiceDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ServiceDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found.<br>`CATEGORY_NOT_FOUND`: The category was not found.<br>`WILAYA_NOT_FOUND`: The wilaya was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CATEGORY_HIDDEN`: This category is hidden and cannot be chosen for a service.<br>`WILAYA_CLOSED`: Some wilayas are closed: {closed}. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_publishService: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ServiceDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_INVALID_TRANSITION`: This action is not possible while the service is {status}. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_PUBLISH_INVALID`: The service cannot be published yet: {missing}.<br>`PROVIDER_NOT_VERIFIED`: Your profile is still being reviewed. You can publish and accept bookings once it is approved. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_unpublishService: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ServiceDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_INVALID_TRANSITION`: This action is not possible while the service is {status}. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_addServicePhoto: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PhotoDto"][];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TOO_LARGE`: The file is larger than {maxMb} MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TYPE_NOT_ALLOWED`: This file type is not allowed. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PHOTO_LIMIT_REACHED`: The photo limit ({max}) is reached. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_orderServicePhotos: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppPhotoOrderDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PhotoDto"][];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PHOTO_ORDER_INVALID`: The order must list every photo exactly once. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_deleteServicePhoto: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PhotoDto"][];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_NOT_FOUND`: The service was not found.<br>`PHOTO_NOT_FOUND`: The photo was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `SERVICE_PUBLISH_INVALID`: The service cannot be published yet: {missing}. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_listPacks: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PackRowDto"][];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_createPack: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppCreatePackDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PackDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `WILAYA_NOT_FOUND`: The wilaya was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_SERVICE_NOT_FOUND`: Some services of the pack were not found.<br>`PACK_SERVICE_OTHER_PROVIDER`: Every service of a pack must belong to the pack’s provider.<br>`WILAYA_CLOSED`: Some wilayas are closed: {closed}.<br>`NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_getPack: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PackDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_NOT_FOUND`: The pack was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_deletePack: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The deleted pack’s id. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_NOT_FOUND`: The pack was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_HAS_BOOKINGS`: This pack has {upcomingBookings} accepted upcoming bookings. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_updatePack: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppUpdatePackDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PackDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_NOT_FOUND`: The pack was not found.<br>`WILAYA_NOT_FOUND`: The wilaya was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_SERVICE_NOT_FOUND`: Some services of the pack were not found.<br>`PACK_SERVICE_OTHER_PROVIDER`: Every service of a pack must belong to the pack’s provider.<br>`WILAYA_CLOSED`: Some wilayas are closed: {closed}. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_publishPack: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PackDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_NOT_FOUND`: The pack was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_INVALID_TRANSITION`: This action is not possible while the pack is {status}. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_PUBLISH_INVALID`: The pack cannot be published yet: {missing}.<br>`PROVIDER_NOT_VERIFIED`: Your profile is still being reviewed. You can publish and accept bookings once it is approved. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_unpublishPack: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PackDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_NOT_FOUND`: The pack was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_INVALID_TRANSITION`: This action is not possible while the pack is {status}. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_addPackPhoto: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PhotoDto"][];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_NOT_FOUND`: The pack was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TOO_LARGE`: The file is larger than {maxMb} MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TYPE_NOT_ALLOWED`: This file type is not allowed. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PHOTO_LIMIT_REACHED`: The photo limit ({max}) is reached. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_orderPackPhotos: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppPhotoOrderDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PhotoDto"][];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_NOT_FOUND`: The pack was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PHOTO_ORDER_INVALID`: The order must list every photo exactly once. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_deletePackPhoto: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PhotoDto"][];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `PACK_NOT_FOUND`: The pack was not found.<br>`PHOTO_NOT_FOUND`: The photo was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_availability: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM`. */
+                month: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AvailabilityMonthDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_block: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppCreateBlockDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AvailabilityBlockDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AVAILABILITY_DATE_PAST`: The date is in the past.<br>`AVAILABILITY_SERVICE_INVALID`: The service does not belong to this provider.<br>`NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_unblock: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AVAILABILITY_BLOCK_NOT_FOUND`: The availability block was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AVAILABILITY_BLOCK_NOT_REMOVABLE`: Only manual blocks can be removed; this day is held or booked by a booking. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppProviderController_reviews: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppProviderReviewDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PROVIDER`: This action is only available for provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMessagesController_list: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+                /** @description Screen 14’s All / Unread chips; `booking` keeps the chats attached to a booking. */
+                filter?: "all" | "unread" | "booking";
+                /** @description Return only the **direct** conversation with this user — the "Message" button checks for an existing chat with it. Empty list when the two of you have never talked. */
+                userId?: string;
+                /** @description Search the other participant’s name. */
+                q?: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppConversationRowDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMessagesController_start: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppStartConversationDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppConversationDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item.<br>`CONVERSATION_READ_ONLY`: You cannot write in this conversation. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `USER_NOT_FOUND`: The user was not found.<br>`BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CONVERSATION_CLOSED`: This conversation is closed. Reopen it to write. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RECIPIENT_INVALID`: Messages can only be sent to existing client or provider accounts. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMessagesController_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppConversationDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PARTICIPANT`: You are not part of this conversation. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CONVERSATION_NOT_FOUND`: The conversation was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMessagesController_messagesPage: {
+        parameters: {
+            query?: {
+                /** @description Cursor: return the messages **older** than this one (infinite scroll upwards). */
+                before?: string;
+                limit?: components["schemas"]["Object"];
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A cursor page: `{ data, meta: { limit, hasMore, nextBefore } }`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppMessagesPageDto"];
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PARTICIPANT`: You are not part of this conversation. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CONVERSATION_NOT_FOUND`: The conversation was not found.<br>`MESSAGE_NOT_FOUND`: The message was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMessagesController_send: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example We can be there from 17:00. */
+                    body?: string;
+                    /**
+                     * Format: binary
+                     * @description An image, as multipart.
+                     */
+                    file?: string;
+                };
+                "multipart/form-data": {
+                    /** @example We can be there from 17:00. */
+                    body?: string;
+                    /**
+                     * Format: binary
+                     * @description An image, as multipart.
+                     */
+                    file?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppMessageDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PARTICIPANT`: You are not part of this conversation.<br>`CONVERSATION_READ_ONLY`: You cannot write in this conversation. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CONVERSATION_NOT_FOUND`: The conversation was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CONVERSATION_CLOSED`: This conversation is closed. Reopen it to write. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TOO_LARGE`: The file is larger than {maxMb} MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TYPE_NOT_ALLOWED`: This file type is not allowed. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMessagesController_startSupport: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppStartSupportConversationDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppConversationDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CONVERSATION_READ_ONLY`: You cannot write in this conversation. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `USER_NOT_FOUND`: The user was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CONVERSATION_CLOSED`: This conversation is closed. Reopen it to write. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMessagesController_read: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppReadResultDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PARTICIPANT`: You are not part of this conversation. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CONVERSATION_NOT_FOUND`: The conversation was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMessagesController_reportMessage: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppReportMessageDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppReportResultDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PARTICIPANT`: You are not part of this conversation. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `MESSAGE_NOT_FOUND`: The message was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMessagesController_report: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppReportDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppReportResultDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_A_PARTICIPANT`: You are not part of this conversation. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REPORT_TARGET_NOT_FOUND`: The reported item was not found.<br>`MESSAGE_NOT_FOUND`: The message was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_create: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppCreateReviewDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppMyReviewDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item.<br>`FORBIDDEN_ROLE`: Your account role cannot access this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REVIEW_EXISTS`: You have already reviewed this booking. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REVIEW_NOT_ALLOWED`: Only the client of a completed booking can leave a review.<br>`REVIEW_WINDOW_CLOSED`: The review window for this booking is closed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_edit: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppEditReviewDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppMyReviewDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item.<br>`FORBIDDEN_ROLE`: Your account role cannot access this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REVIEW_NOT_FOUND`: The review was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REVIEW_EDIT_WINDOW_CLOSED`: A review can only be edited within 48 hours. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_mine: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppMyReviewDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FORBIDDEN_ROLE`: Your account role cannot access this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_reply: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppReviewReplyDto"];
+            };
+        };
+        responses: {
+            /** @description The new reply’s id. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item.<br>`FORBIDDEN_ROLE`: Your account role cannot access this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REVIEW_NOT_FOUND`: The review was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REVIEW_REPLY_EXISTS`: You have already replied to this review. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_deleteReply: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item.<br>`FORBIDDEN_ROLE`: Your account role cannot access this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REVIEW_REPLY_NOT_FOUND`: The review reply was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REVIEW_EDIT_WINDOW_CLOSED`: A review can only be edited within 48 hours. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_editReply: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppReviewReplyDto"];
+            };
+        };
+        responses: {
+            /** @description The reply’s id. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item.<br>`FORBIDDEN_ROLE`: Your account role cannot access this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REVIEW_REPLY_NOT_FOUND`: The review reply was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `REVIEW_EDIT_WINDOW_CLOSED`: A review can only be edited within 48 hours. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_openDispute: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppOpenDisputeDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppDisputeDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_FOUND`: The booking was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `DISPUTE_ALREADY_OPEN`: This booking already has an open dispute ({reference}). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BOOKING_NOT_DISPUTABLE`: A dispute can only be opened on an accepted, completed or cancelled booking.<br>`DISPUTE_WINDOW_CLOSED`: The dispute window for this booking is closed. Use ignoreWindow with a note to open it anyway.<br>`EVIDENCE_FILE_INVALID`: Some evidence files do not exist or are not private uploads.<br>`DISPUTE_EVIDENCE_LIMIT`: A party can add at most {max} evidence files. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_listDisputes: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppDisputeRowDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_dispute: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppDisputeDetailDto"];
+                    };
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `DISPUTE_NOT_FOUND`: The dispute was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_disputeMessage: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppDisputeMessageDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppMessageDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `DISPUTE_NOT_FOUND`: The dispute was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `CONVERSATION_CLOSED`: This conversation is closed. Reopen it to write. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_addEvidence: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /** @example Call log screenshot. */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppDisputeDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `DISPUTE_NOT_FOUND`: The dispute was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `DISPUTE_INVALID_TRANSITION`: This action is not possible on a {status} dispute. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TOO_LARGE`: The file is larger than {maxMb} MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `FILE_TYPE_NOT_ALLOWED`: This file type is not allowed. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `DISPUTE_EVIDENCE_LIMIT`: A party can add at most {max} evidence files. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppReviewsController_withdraw: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppWithdrawDisputeDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppDisputeDetailDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `NOT_OWNER`: You do not own this item. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `DISPUTE_NOT_FOUND`: The dispute was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `DISPUTE_NOT_WITHDRAWABLE`: Only the person who opened a dispute can withdraw it, while it is still open. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

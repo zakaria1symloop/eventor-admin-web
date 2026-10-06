@@ -34,7 +34,15 @@ export type VisibilityReason =
   | "provider_blocked"
   | "provider_not_verified"
   | "provider_deleted"
-  | "no_open_wilaya";
+  | "no_open_wilaya"
+  | "period_ended";
+
+/** One bookable range of a weekday (1 = Monday … 7 = Sunday); an end at or before the start runs past midnight. */
+export interface ServiceHour {
+  weekday: number;
+  startTime: string;
+  endTime: string;
+}
 
 export interface ServiceProviderRef {
   id: string;
@@ -160,6 +168,10 @@ export interface ServiceDetail extends ServiceRow {
   facts: ServiceFact[];
   maxEventsPerDay: number;
   maxGuests: number | null;
+  concurrentClients: number;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  hours: ServiceHour[];
   featuredPosition: number | null;
   favouritesCount: number;
   extras: ServiceExtra[];
@@ -199,6 +211,10 @@ export interface CreateServiceBody {
   priceType: PriceType;
   maxEventsPerDay?: number;
   maxGuests?: number | null;
+  concurrentClients?: number;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+  hours?: ServiceHour[];
   wilayaCodes?: number[];
   extras?: ServiceExtraInput[];
   status?: "draft" | "published";
@@ -223,7 +239,7 @@ export interface AvailabilityBlock {
   startTime: string | null;
   endTime: string | null;
   service: { id: string; titleEn: string; titleAr: string } | null;
-  booking: { id: string; reference: string; status: string } | null;
+  booking: { id: string; reference: string; status: string; clientName: string | null } | null;
   note: string | null;
   removable: boolean;
 }

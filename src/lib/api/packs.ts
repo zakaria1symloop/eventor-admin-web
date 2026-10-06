@@ -31,13 +31,15 @@ export type PackPublishField =
   | "unpublishedItems"
   | "providerBlocked"
   | "providerNotVerified"
-  | "priceNotBelowSum";
+  | "priceNotBelowSum"
+  | "wilayaNotCovered";
 /** Checklist order; `nameEn` and `providerBlocked` are covered by the `nameAr` / `providerNotVerified` rows. */
 export const PACK_PUBLISH_FIELDS: PackPublishField[] = [
   "items",
   "providerNotVerified",
   "nameAr",
   "unpublishedItems",
+  "wilayaNotCovered",
   "priceNotBelowSum",
 ];
 

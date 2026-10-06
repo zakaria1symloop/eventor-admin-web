@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/errors";
 import {
   apiErrorToFields,
+  emptyServiceValues,
   firstErrorField,
   langForErrors,
   publishErrorsToFields,
+  validateDraft,
+  valuesToBody,
 } from "./service-form-utils";
 
 const t = (key: string) => `msg:${key}`;
@@ -63,5 +66,62 @@ describe("SERVICE_PUBLISH_INVALID → form fields", () => {
     expect(apiErrorToFields(new ApiError({ status: 500, code: "INTERNAL_ERROR", message: "x" }), t)).toEqual(
       {},
     );
+  });
+});
+
+describe("booking schedule (issues 3 #6–#8)", () => {
+  const base = () => ({ ...emptyServiceValues(), basePrice: 1000, categoryId: "c1" });
+  const t = (key: string) => `msg:${key}`;
+
+  it("sends hours only when set hours are on, and empty dates as null", () => {
+    const hours = [{ weekday: 5, startTime: "20:00", endTime: "02:00" }];
+    expect(valuesToBody({ ...base(), hoursEnabled: false, hours })).toMatchObject({
+      hours: [],
+      availableFrom: null,
+      availableUntil: null,
+      concurrentClients: 1,
+    });
+    expect(
+      valuesToBody({ ...base(), hoursEnabled: true, hours, availableFrom: "2027-03-01", concurrentClients: 3 }),
+    ).toMatchObject({ hours, availableFrom: "2027-03-01", availableUntil: null, concurrentClients: 3 });
+  });
+
+  it("refuses a period that ends before it starts, no open day, equal times and a bad client count", () => {
+    const errors = validateDraft(
+      {
+        ...base(),
+        availableFrom: "2027-03-10",
+        availableUntil: "2027-03-01",
+        hoursEnabled: true,
+        hours: [],
+        concurrentClients: 0,
+      },
+      t,
+      "p1",
+    );
+    expect(errors).toMatchObject({
+      availablePeriod: "msg:errors.availablePeriod",
+      hours: "msg:errors.hoursEmpty",
+      concurrentClients: "msg:errors.concurrentClients",
+    });
+    const same = validateDraft(
+      { ...base(), hoursEnabled: true, hours: [{ weekday: 1, startTime: "10:00", endTime: "10:00" }] },
+      t,
+      "p1",
+    );
+    expect(same.hours).toBe("msg:errors.hoursSameTime");
+  });
+
+  it("puts API validation details for hours and dates on the schedule fields", () => {
+    const error = new ApiError({
+      status: 400,
+      code: "VALIDATION_FAILED",
+      message: "Invalid",
+      details: [
+        { field: "hours.1", code: "OVERLAP", message: "overlap" },
+        { field: "availableUntil", code: "BEFORE_FROM", message: "before" },
+      ],
+    });
+    expect(apiErrorToFields(error, t)).toEqual({ hours: "overlap", availablePeriod: "before" });
   });
 });

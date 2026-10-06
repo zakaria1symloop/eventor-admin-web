@@ -42,7 +42,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { Link, useRouter } from "@/i18n/navigation";
 import { ApiError } from "@/lib/api/errors";
 import { getService, localTitle, serviceKeys, type ServiceDetail } from "@/lib/api/services";
-import { formatCompactMoney, formatDateTime, formatMoney, formatNumber, initials } from "@/lib/utils/format";
+import { formatCompactMoney, formatDate, formatDateTime, formatMoney, formatNumber, initials } from "@/lib/utils/format";
 import { localName } from "../../users/use-user-options";
 import { PhotoGallery } from "../photo-gallery";
 import { DeleteServiceDialog, HideServiceDialog, showServices, toggleFeatured } from "../service-dialogs";
@@ -442,10 +442,22 @@ function Details({
 }) {
   const t = useTranslations("services");
   const td = useTranslations("services.detail");
+  const tw = useTranslations("weeklyHours");
   const locale = useLocale();
   const queryClient = useQueryClient();
   const invalidate = () => queryClient.invalidateQueries({ queryKey: serviceKeys.all });
   const editHref = `/services/${s.id}/edit`;
+  const hoursSummary =
+    s.hours.length === 0
+      ? td("anyTime")
+      : [1, 2, 3, 4, 5, 6, 7]
+          .filter((d) => s.hours.some((h) => h.weekday === d))
+          .map((d) => `${tw(`days.${d}`)} ${s.hours.filter((h) => h.weekday === d).map((h) => `${h.startTime}–${h.endTime}`).join(", ")}`)
+          .join(" · ");
+  const period =
+    !s.availableFrom && !s.availableUntil
+      ? td("noLimit")
+      : `${s.availableFrom ? formatDate(s.availableFrom, locale) : "…"} – ${s.availableUntil ? formatDate(s.availableUntil, locale) : "…"}`;
   const bothFilled = !!(s.titleEn && s.titleAr && s.descriptionEn && s.descriptionAr);
   const target = { id: s.id, title: localTitle(s, locale), isFeatured: s.isFeatured };
   const pc = s.providerCard;
@@ -501,6 +513,9 @@ function Details({
               { label: td("deposit"), value: td("depositNone") },
               { label: td("maxEventsPerDay"), value: s.maxEventsPerDay },
               { label: td("maxGuests"), value: s.maxGuests ?? "—" },
+              { label: td("concurrentClients"), value: s.concurrentClients },
+              { label: td("availablePeriod"), value: period },
+              { label: td("hours"), value: hoursSummary },
             ]}
           />
           <div className="border-border max-md:border-t">

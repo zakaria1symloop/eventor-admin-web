@@ -2136,7 +2136,8 @@
         "provider_blocked": "The provider is blocked",
         "provider_not_verified": "The provider isn't verified yet",
         "provider_deleted": "The provider account was deleted",
-        "no_open_wilaya": "None of its wilayas is open"
+        "no_open_wilaya": "None of its wilayas is open",
+        "period_ended": "Its availability period has ended"
       },
       "publishMissing": "Needed before publishing",
       "packsTitle": "Ready Packs using this service",
@@ -2146,7 +2147,12 @@
       "comingSoonDescription": "This tab arrives with module {module}.",
       "openBookings": "Open bookings list",
       "openReviews": "Open reviews list",
-      "openActivityLog": "Open activity log"
+      "openActivityLog": "Open activity log",
+      "concurrentClients": "Clients at the same time",
+      "availablePeriod": "Available for events",
+      "hours": "Bookable hours",
+      "anyTime": "Any time",
+      "noLimit": "No limit"
     },
     "form": {
       "newTitle": "Add service",
@@ -2229,8 +2235,20 @@
         "price": "Enter a base price",
         "category": "Pick a category",
         "maxEvents": "At least 1",
-        "extra": "Each extra needs an English name, an Arabic name and a price"
-      }
+        "extra": "Each extra needs an English name, an Arabic name and a price",
+        "concurrentClients": "Between 1 and 50",
+        "availablePeriod": "The end date can't be before the start date",
+        "hoursEmpty": "Open at least one day, or turn set hours off",
+        "hoursSameTime": "A range can't start and end at the same time"
+      },
+      "schedule": "Booking schedule",
+      "scheduleHint": "When clients can book this service.",
+      "concurrentClients": "Clients at the same time",
+      "concurrentClientsHint": "How many different clients can book overlapping hours. Bookings without times only count against bookings per day.",
+      "availablePeriod": "Available for events from – to",
+      "availablePeriodHint": "Leave empty for no limit. The service leaves the app after the last date.",
+      "hoursToggle": "Only bookable at set hours",
+      "hoursHint": "Clients must pick times inside these hours. Off: any time of day."
     }
   },
   "packs": {
@@ -2349,7 +2367,8 @@
       "nameAr": "English and Arabic name",
       "unpublishedItems": "Every service is published",
       "priceNotBelowSum": "Pack price lower than the total",
-      "photos": "Photos (optional)"
+      "photos": "Photos (optional)",
+      "wilayaNotCovered": "Every service covers the pack’s wilaya"
     },
     "publishErrors": {
       "nameEn": "English name is required",
@@ -2358,7 +2377,8 @@
       "unpublishedItems": "Every service in the pack must be published",
       "providerBlocked": "The provider is blocked",
       "providerNotVerified": "The provider must be verified",
-      "priceNotBelowSum": "The pack price must be lower than the services separately"
+      "priceNotBelowSum": "The pack price must be lower than the services separately",
+      "wilayaNotCovered": "Every service in the pack must cover the pack’s wilaya"
     },
     "delete": {
       "title": "Delete “{name}”?",
@@ -4242,5 +4262,22 @@
     "remove": "Remove photo",
     "updated": "Photo updated.",
     "removed": "Photo removed."
+  },
+  "weeklyHours": {
+    "days": {
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday",
+      "7": "Sunday"
+    },
+    "closed": "Closed",
+    "from": "{day}: from",
+    "to": "{day}: to",
+    "nextDay": "next day",
+    "removeRange": "Remove hours",
+    "addRange": "Add hours"
   }
 }

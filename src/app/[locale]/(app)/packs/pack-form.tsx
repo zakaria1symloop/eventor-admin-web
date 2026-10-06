@@ -70,6 +70,7 @@ const PUBLISH_FIELD: Record<PackPublishField, string> = {
   providerBlocked: "providerId",
   providerNotVerified: "providerId",
   priceNotBelowSum: "price",
+  wilayaNotCovered: "wilayaCode",
 };
 
 /** PACK_PUBLISH_INVALID `details.missing` → `{ field: message }`. */

@@ -12,7 +12,8 @@ import { UnsavedChangesGuard, useUnsavedChanges } from "@/components/feedback/un
 import { BilingualFields } from "@/components/forms/bilingual-fields";
 import { LineItemsEditor } from "@/components/forms/editors";
 import { Field, Select, TextInput, Toggle } from "@/components/forms/fields";
-import { NumberInput } from "@/components/forms/inputs";
+import { DateRangeInput, NumberInput } from "@/components/forms/inputs";
+import { WeeklyHoursEditor } from "@/components/forms/weekly-hours";
 import { PhotoUploader, type PhotoItem } from "@/components/forms/photo-uploader";
 import { AsyncSelect, MultiSelect, type Option } from "@/components/forms/select-inputs";
 import { PageHeader } from "@/components/layout/page-header";
@@ -577,6 +578,46 @@ function ServiceFormInner({
               ) : (
                 <p className="text-13 text-muted">{t("photosAfterDraft")}</p>
               )}
+            </CardBody>
+          </Card>
+
+          <Card id="schedule">
+            <CardHeader title={t("schedule")} subtitle={t("scheduleHint")} />
+            <CardBody className="flex flex-col gap-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div data-field="concurrentClients">
+                  <Field label={t("concurrentClients")} hint={t("concurrentClientsHint")} error={errors.concurrentClients}>
+                    <NumberInput
+                      name="concurrentClients"
+                      value={values.concurrentClients}
+                      onValueChange={(n) => set("concurrentClients", n)}
+                    />
+                  </Field>
+                </div>
+                <div data-field="availablePeriod">
+                  <Field label={t("availablePeriod")} hint={t("availablePeriodHint")} error={errors.availablePeriod}>
+                    <DateRangeInput
+                      aria-label={t("availablePeriod")}
+                      value={{ from: values.availableFrom, to: values.availableUntil }}
+                      onValueChange={(r) => {
+                        set("availableFrom", r.from);
+                        set("availableUntil", r.to);
+                      }}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <div data-field="hours" className="flex flex-col gap-3">
+                <ToggleRow
+                  label={t("hoursToggle")}
+                  hint={t("hoursHint")}
+                  checked={values.hoursEnabled}
+                  onCheckedChange={(c) => set("hoursEnabled", c)}
+                />
+                {values.hoursEnabled && (
+                  <WeeklyHoursEditor value={values.hours} onValueChange={(h) => set("hours", h)} error={errors.hours} />
+                )}
+              </div>
             </CardBody>
           </Card>
         </div>

@@ -8,6 +8,7 @@ import {
   type Photo,
   type PriceType,
   type ServiceDetail,
+  type ServiceHour,
   type ServicePublishField,
 } from "@/lib/api/services";
 
@@ -26,6 +27,14 @@ export interface ServiceFormValues {
   priceType: PriceType;
   maxEventsPerDay: number | null;
   maxGuests: number | null;
+  /** Different clients who may book overlapping hours. */
+  concurrentClients: number | null;
+  /** Event dates the service can be booked for ("" = no limit). */
+  availableFrom: string;
+  availableUntil: string;
+  /** Off = bookable at any hour (hours sent as []). */
+  hoursEnabled: boolean;
+  hours: ServiceHour[];
   extras: LineItem[];
   wilayaCodes: string[];
   categoryId: string;
@@ -51,6 +60,9 @@ export const FIELD_ORDER = [
   "wilayaCodes",
   "maxEventsPerDay",
   "maxGuests",
+  "concurrentClients",
+  "availablePeriod",
+  "hours",
 ] as const;
 
 let seq = 0;
@@ -71,6 +83,11 @@ export function emptyServiceValues(): ServiceFormValues {
     priceType: "per_event",
     maxEventsPerDay: 1,
     maxGuests: null,
+    concurrentClients: 1,
+    availableFrom: "",
+    availableUntil: "",
+    hoursEnabled: false,
+    hours: [],
     extras: [],
     wilayaCodes: [],
     categoryId: "",
@@ -94,6 +111,11 @@ export function serviceToValues(s: ServiceDetail): ServiceFormValues {
     priceType: s.priceType,
     maxEventsPerDay: s.maxEventsPerDay,
     maxGuests: s.maxGuests,
+    concurrentClients: s.concurrentClients,
+    availableFrom: s.availableFrom ?? "",
+    availableUntil: s.availableUntil ?? "",
+    hoursEnabled: s.hours.length > 0,
+    hours: s.hours,
     extras: s.extras.map((x) => ({ id: x.id, label: x.nameEn, labelAr: x.nameAr, amount: Number(x.price) })),
     wilayaCodes: s.wilayaDetails.map((w) => String(w.code)),
     categoryId: s.category.id,
@@ -133,6 +155,10 @@ export function valuesToBody(v: ServiceFormValues): Omit<CreateServiceBody, "pro
     priceType: v.priceType,
     maxEventsPerDay: v.maxEventsPerDay ?? 1,
     maxGuests: v.maxGuests,
+    concurrentClients: v.concurrentClients ?? 1,
+    availableFrom: v.availableFrom || null,
+    availableUntil: v.availableUntil || null,
+    hours: v.hoursEnabled ? v.hours : [],
     wilayaCodes: v.wilayaCodes.map(Number),
     extras: v.extras
       .filter((x) => x.label.trim() || (x.labelAr ?? "").trim() || x.amount !== null)
@@ -154,6 +180,12 @@ export function validateDraft(v: ServiceFormValues, t: Translate, providerId: st
   if (v.basePrice === null || v.basePrice < 0) errors.basePrice = t("errors.price");
   if (!v.categoryId) errors.categoryId = t("errors.category");
   if (v.maxEventsPerDay !== null && v.maxEventsPerDay < 1) errors.maxEventsPerDay = t("errors.maxEvents");
+  if (v.concurrentClients !== null && (v.concurrentClients < 1 || v.concurrentClients > 50))
+    errors.concurrentClients = t("errors.concurrentClients");
+  if (v.availableFrom && v.availableUntil && v.availableUntil < v.availableFrom)
+    errors.availablePeriod = t("errors.availablePeriod");
+  if (v.hoursEnabled && v.hours.length === 0) errors.hours = t("errors.hoursEmpty");
+  if (v.hoursEnabled && v.hours.some((h) => h.startTime === h.endTime)) errors.hours = t("errors.hoursSameTime");
   v.extras.forEach((x) => {
     if (!x.label.trim() || !(x.labelAr ?? "").trim() || x.amount === null)
       errors[`extra:${x.id}`] = t("errors.extra");
@@ -184,6 +216,10 @@ const API_FIELD: Record<string, string> = {
   wilayaCodes: "wilayaCodes",
   maxEventsPerDay: "maxEventsPerDay",
   maxGuests: "maxGuests",
+  concurrentClients: "concurrentClients",
+  availableFrom: "availablePeriod",
+  availableUntil: "availablePeriod",
+  hours: "hours",
   extras: "extras",
   facts: "facts",
 };
