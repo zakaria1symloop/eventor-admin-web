@@ -166,7 +166,10 @@ export interface ServiceDetail extends ServiceRow {
   cancellationPolicyEn: string | null;
   cancellationPolicyAr: string | null;
   facts: ServiceFact[];
-  maxEventsPerDay: number;
+  /** "Only one booking per day" is ticked. */
+  onePerDay: boolean;
+  /** 1 when `onePerDay`; null = no daily limit. */
+  maxEventsPerDay: number | null;
   maxGuests: number | null;
   concurrentClients: number;
   availableFrom: string | null;
@@ -209,7 +212,8 @@ export interface CreateServiceBody {
   facts?: ServiceFact[] | null;
   basePrice: string;
   priceType: PriceType;
-  maxEventsPerDay?: number;
+  /** "Only one booking per day": true = 1 a day, false = no daily limit. */
+  onePerDay?: boolean;
   maxGuests?: number | null;
   concurrentClients?: number;
   availableFrom?: string | null;
@@ -251,7 +255,8 @@ export interface AvailabilityDay {
 export interface AvailabilityMonth {
   providerId: string;
   month: string;
-  maxEventsPerDay: number;
+  /** Highest daily limit of the provider's services; null when one has no limit. */
+  maxEventsPerDay: number | null;
   days: AvailabilityDay[];
 }
 export interface CreateBlockBody {

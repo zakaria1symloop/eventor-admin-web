@@ -11,7 +11,7 @@ import { toast } from "@/components/feedback/toast";
 import { UnsavedChangesGuard, useUnsavedChanges } from "@/components/feedback/unsaved-changes-guard";
 import { BilingualFields } from "@/components/forms/bilingual-fields";
 import { LineItemsEditor } from "@/components/forms/editors";
-import { Field, Select, TextInput, Toggle } from "@/components/forms/fields";
+import { Checkbox, Field, Select, TextInput, Toggle } from "@/components/forms/fields";
 import { DateRangeInput, NumberInput } from "@/components/forms/inputs";
 import { WeeklyHoursEditor } from "@/components/forms/weekly-hours";
 import { PhotoUploader, type PhotoItem } from "@/components/forms/photo-uploader";
@@ -665,22 +665,21 @@ function ServiceFormInner({
                   />
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={t("maxEventsPerDay")} error={errors.maxEventsPerDay}>
-                  <NumberInput
-                    name="maxEventsPerDay"
-                    value={values.maxEventsPerDay}
-                    onValueChange={(n) => set("maxEventsPerDay", n)}
-                  />
-                </Field>
-                <Field label={t("maxGuests")} error={errors.maxGuests}>
-                  <NumberInput
-                    name="maxGuests"
-                    value={values.maxGuests}
-                    onValueChange={(n) => set("maxGuests", n)}
-                  />
-                </Field>
+              <div data-field="onePerDay">
+                <Checkbox
+                  checked={values.onePerDay}
+                  onCheckedChange={(c) => set("onePerDay", c)}
+                  label={t("onePerDay")}
+                  description={t("onePerDayHint")}
+                />
               </div>
+              <Field label={t("maxGuests")} error={errors.maxGuests}>
+                <NumberInput
+                  name="maxGuests"
+                  value={values.maxGuests}
+                  onValueChange={(n) => set("maxGuests", n)}
+                />
+              </Field>
             </CardBody>
           </Card>
 

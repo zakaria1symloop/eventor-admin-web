@@ -2054,7 +2054,8 @@
       "note": "Note (admins only)",
       "addBlock": "Block",
       "blocked": "Day blocked",
-      "unblocked": "Block removed"
+      "unblocked": "Block removed",
+      "noDailyLimit": "This provider has a service with no daily booking limit."
     },
     "detail": {
       "metaTitle": "Service",
@@ -2106,7 +2107,6 @@
       "basePrice": "Base price",
       "deposit": "Deposit",
       "depositNone": "None (cash on the day)",
-      "maxEventsPerDay": "Max events per day",
       "maxGuests": "Max guests",
       "noExtras": "No extras",
       "facts": "Key facts",
@@ -2152,7 +2152,10 @@
       "availablePeriod": "Available for events",
       "hours": "Bookable hours",
       "anyTime": "Any time",
-      "noLimit": "No limit"
+      "noLimit": "No limit",
+      "onePerDay": "Only one booking per day",
+      "onePerDayYes": "Yes",
+      "onePerDayNo": "No (no daily limit)"
     },
     "form": {
       "newTitle": "Add service",
@@ -2220,7 +2223,6 @@
       "wilayas": "Wilayas",
       "wilayasHint": "Open wilayas only",
       "closedWilaya": "closed",
-      "maxEventsPerDay": "Max events per day",
       "maxGuests": "Max guests",
       "visibility": "Visibility",
       "publishedToggle": "Published",
@@ -2234,7 +2236,6 @@
         "titleEn": "English title is required",
         "price": "Enter a base price",
         "category": "Pick a category",
-        "maxEvents": "At least 1",
         "extra": "Each extra needs an English name, an Arabic name and a price",
         "concurrentClients": "Between 1 and 50",
         "availablePeriod": "The end date can't be before the start date",
@@ -2244,11 +2245,13 @@
       "schedule": "Booking schedule",
       "scheduleHint": "When clients can book this service.",
       "concurrentClients": "Clients at the same time",
-      "concurrentClientsHint": "How many different clients can book overlapping hours. Bookings without times only count against bookings per day.",
+      "concurrentClientsHint": "How many different clients can book overlapping hours. Bookings without times only count toward “Only one booking per day”.",
       "availablePeriod": "Available for events from – to",
       "availablePeriodHint": "Leave empty for no limit. The service leaves the app after the last date.",
       "hoursToggle": "Only bookable at set hours",
-      "hoursHint": "Clients must pick times inside these hours. Off: any time of day."
+      "hoursHint": "Clients must pick times inside these hours. Off: any time of day.",
+      "onePerDay": "Only one booking per day",
+      "onePerDayHint": "Ticked: once a day has a pending or accepted booking, it is full. Unticked: no daily limit — only the hours and “clients at the same time” limit bookings."
     }
   },
   "packs": {

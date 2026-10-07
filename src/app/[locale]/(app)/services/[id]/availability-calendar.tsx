@@ -181,7 +181,11 @@ export function AvailabilityCalendar({
         onOpenChange={(o) => !o && setOpenDay(null)}
       />
       {query.data && !compact && (
-        <p className="mt-2 text-12 text-faint">{t("maxPerDay", { count: query.data.maxEventsPerDay })}</p>
+        <p className="mt-2 text-12 text-faint">
+          {query.data.maxEventsPerDay === null
+            ? t("noDailyLimit")
+            : t("maxPerDay", { count: query.data.maxEventsPerDay })}
+        </p>
       )}
     </div>
   );

@@ -125,3 +125,23 @@ describe("booking schedule (issues 3 #6–#8)", () => {
     expect(apiErrorToFields(error, t)).toEqual({ hours: "overlap", availablePeriod: "before" });
   });
 });
+
+describe("Only one booking per day", () => {
+  it("is ticked for a new service and sends onePerDay, never a number", () => {
+    const values = { ...emptyServiceValues(), basePrice: 1000, categoryId: "c1" };
+    expect(values.onePerDay).toBe(true);
+    const body = valuesToBody({ ...values, onePerDay: false });
+    expect(body).toMatchObject({ onePerDay: false });
+    expect(body).not.toHaveProperty("maxEventsPerDay");
+  });
+
+  it("puts an old maxEventsPerDay validation error on the checkbox", () => {
+    const error = new ApiError({
+      status: 400,
+      code: "VALIDATION_FAILED",
+      message: "Invalid",
+      details: [{ field: "maxEventsPerDay", code: "MAX", message: "too many" }],
+    });
+    expect(apiErrorToFields(error, (k) => k)).toEqual({ onePerDay: "too many" });
+  });
+});

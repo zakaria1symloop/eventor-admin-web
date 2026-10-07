@@ -8607,8 +8607,16 @@ export interface components {
             cancellationPolicyEn: string | null;
             cancellationPolicyAr: string | null;
             facts: components["schemas"]["ServiceFactDto"][];
-            /** @example 1 */
-            maxEventsPerDay: number;
+            /**
+             * @description "Only one booking per day" is ticked.
+             * @example true
+             */
+            onePerDay: boolean;
+            /**
+             * @description 1 when `onePerDay`; null = no daily limit.
+             * @example 1
+             */
+            maxEventsPerDay: number | null;
             /** @example 400 */
             maxGuests: number | null;
             /**
@@ -8674,8 +8682,17 @@ export interface components {
             /** @example إلغاء مجاني حتى 30 يومًا قبل المناسبة. */
             cancellationPolicyAr?: string | null;
             facts?: components["schemas"]["ServiceFactDto"][] | null;
-            /** @example 1 */
-            maxEventsPerDay?: number;
+            /**
+             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `concurrentClients` limit bookings). Wins over `maxEventsPerDay`.
+             * @example true
+             */
+            onePerDay?: boolean;
+            /**
+             * @deprecated
+             * @description Deprecated: send `onePerDay`. null = no daily limit.
+             * @example 1
+             */
+            maxEventsPerDay?: number | null;
             /** @example 400 */
             maxGuests?: number | null;
             /**
@@ -8763,8 +8780,17 @@ export interface components {
             basePrice?: string;
             /** @enum {string} */
             priceType?: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
-            /** @example 1 */
-            maxEventsPerDay?: number;
+            /**
+             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `concurrentClients` limit bookings). Wins over `maxEventsPerDay`.
+             * @example true
+             */
+            onePerDay?: boolean;
+            /**
+             * @deprecated
+             * @description Deprecated: send `onePerDay`. null = no daily limit.
+             * @example 1
+             */
+            maxEventsPerDay?: number | null;
             /** @example 400 */
             maxGuests?: number | null;
             /**
@@ -8898,10 +8924,10 @@ export interface components {
             /** @example 2026-10 */
             month: string;
             /**
-             * @description Max events per day of the provider’s services (highest).
+             * @description Bookings per day of the provider’s services (highest); null when one of them has no daily limit.
              * @example 1
              */
-            maxEventsPerDay: number;
+            maxEventsPerDay: number | null;
             /** @description Every day of the month. */
             days: components["schemas"]["AvailabilityDayDto"][];
         };
@@ -11881,10 +11907,15 @@ export interface components {
             /** @example 300 */
             maxGuests: number | null;
             /**
-             * @description Events the provider takes per day for this service.
+             * @description "Only one booking per day": a day with one pending or accepted booking is full.
+             * @example true
+             */
+            onePerDay: boolean;
+            /**
+             * @description 1 when `onePerDay`; null = no daily limit.
              * @example 1
              */
-            maxEventsPerDay: number;
+            maxEventsPerDay: number | null;
             /**
              * @description Different clients who may book overlapping hours (timed bookings).
              * @example 1
@@ -11938,10 +11969,10 @@ export interface components {
             /** @example 2026-03 */
             month: string;
             /**
-             * @description Events accepted per day (the smallest among a pack’s items).
+             * @description Bookings accepted per day (the smallest among a pack’s items); null = no daily limit.
              * @example 1
              */
-            maxEventsPerDay: number;
+            maxEventsPerDay: number | null;
             /**
              * @description `booking_min_notice_days`: days before which nothing can be booked.
              * @example 0
@@ -12905,8 +12936,17 @@ export interface components {
             /** @example إلغاء مجاني حتى 30 يومًا قبل المناسبة. */
             cancellationPolicyAr?: string | null;
             facts?: components["schemas"]["ServiceFactDto"][] | null;
-            /** @example 1 */
-            maxEventsPerDay?: number;
+            /**
+             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `concurrentClients` limit bookings). Wins over `maxEventsPerDay`.
+             * @example true
+             */
+            onePerDay?: boolean;
+            /**
+             * @deprecated
+             * @description Deprecated: send `onePerDay`. null = no daily limit.
+             * @example 1
+             */
+            maxEventsPerDay?: number | null;
             /** @example 400 */
             maxGuests?: number | null;
             /**
@@ -12982,8 +13022,17 @@ export interface components {
             basePrice?: string;
             /** @enum {string} */
             priceType?: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
-            /** @example 1 */
-            maxEventsPerDay?: number;
+            /**
+             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `concurrentClients` limit bookings). Wins over `maxEventsPerDay`.
+             * @example true
+             */
+            onePerDay?: boolean;
+            /**
+             * @deprecated
+             * @description Deprecated: send `onePerDay`. null = no daily limit.
+             * @example 1
+             */
+            maxEventsPerDay?: number | null;
             /** @example 400 */
             maxGuests?: number | null;
             /**

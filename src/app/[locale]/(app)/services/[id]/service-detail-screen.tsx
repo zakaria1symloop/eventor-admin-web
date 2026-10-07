@@ -511,7 +511,7 @@ function Details({
                 ),
               },
               { label: td("deposit"), value: td("depositNone") },
-              { label: td("maxEventsPerDay"), value: s.maxEventsPerDay },
+              { label: td("onePerDay"), value: s.onePerDay ? td("onePerDayYes") : td("onePerDayNo") },
               { label: td("maxGuests"), value: s.maxGuests ?? "—" },
               { label: td("concurrentClients"), value: s.concurrentClients },
               { label: td("availablePeriod"), value: period },

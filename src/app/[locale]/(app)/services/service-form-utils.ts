@@ -25,7 +25,8 @@ export interface ServiceFormValues {
   facts: FactRow[];
   basePrice: number | null;
   priceType: PriceType;
-  maxEventsPerDay: number | null;
+  /** "Only one booking per day": ticked = 1 a day, unticked = no daily limit. */
+  onePerDay: boolean;
   maxGuests: number | null;
   /** Different clients who may book overlapping hours. */
   concurrentClients: number | null;
@@ -58,7 +59,7 @@ export const FIELD_ORDER = [
   "photos",
   "categoryId",
   "wilayaCodes",
-  "maxEventsPerDay",
+  "onePerDay",
   "maxGuests",
   "concurrentClients",
   "availablePeriod",
@@ -81,7 +82,7 @@ export function emptyServiceValues(): ServiceFormValues {
     facts: [],
     basePrice: null,
     priceType: "per_event",
-    maxEventsPerDay: 1,
+    onePerDay: true,
     maxGuests: null,
     concurrentClients: 1,
     availableFrom: "",
@@ -109,7 +110,7 @@ export function serviceToValues(s: ServiceDetail): ServiceFormValues {
     facts: s.facts.map((f) => ({ id: rowId("fact"), ...f })),
     basePrice: Number(s.basePrice),
     priceType: s.priceType,
-    maxEventsPerDay: s.maxEventsPerDay,
+    onePerDay: s.onePerDay,
     maxGuests: s.maxGuests,
     concurrentClients: s.concurrentClients,
     availableFrom: s.availableFrom ?? "",
@@ -153,7 +154,7 @@ export function valuesToBody(v: ServiceFormValues): Omit<CreateServiceBody, "pro
       })),
     basePrice: String(v.basePrice ?? 0),
     priceType: v.priceType,
-    maxEventsPerDay: v.maxEventsPerDay ?? 1,
+    onePerDay: v.onePerDay,
     maxGuests: v.maxGuests,
     concurrentClients: v.concurrentClients ?? 1,
     availableFrom: v.availableFrom || null,
@@ -179,7 +180,6 @@ export function validateDraft(v: ServiceFormValues, t: Translate, providerId: st
   if (!v.text.title_en.trim()) errors.title_en = t("errors.titleEn");
   if (v.basePrice === null || v.basePrice < 0) errors.basePrice = t("errors.price");
   if (!v.categoryId) errors.categoryId = t("errors.category");
-  if (v.maxEventsPerDay !== null && v.maxEventsPerDay < 1) errors.maxEventsPerDay = t("errors.maxEvents");
   if (v.concurrentClients !== null && (v.concurrentClients < 1 || v.concurrentClients > 50))
     errors.concurrentClients = t("errors.concurrentClients");
   if (v.availableFrom && v.availableUntil && v.availableUntil < v.availableFrom)
@@ -214,7 +214,8 @@ const API_FIELD: Record<string, string> = {
   categoryId: "categoryId",
   providerId: "providerId",
   wilayaCodes: "wilayaCodes",
-  maxEventsPerDay: "maxEventsPerDay",
+  maxEventsPerDay: "onePerDay",
+  onePerDay: "onePerDay",
   maxGuests: "maxGuests",
   concurrentClients: "concurrentClients",
   availableFrom: "availablePeriod",
