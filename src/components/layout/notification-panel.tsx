@@ -143,6 +143,7 @@ export function NotificationPanel({ enabled = false, count }: { enabled?: boolea
         <Popover.Content
           align="end"
           sideOffset={8}
+          collisionPadding={8}
           aria-label={t("title")}
           className="z-50 w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-xl border border-border bg-surface shadow-overlay"
         >

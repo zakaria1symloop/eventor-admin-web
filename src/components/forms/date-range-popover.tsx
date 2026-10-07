@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
+import { DROPDOWN_COLLISION_PADDING, popoverSurface } from "@/components/ui/dropdown";
 import { DateRangeInput, type DateRange } from "./inputs";
 
 export interface DateRangePreset {
@@ -65,7 +66,8 @@ export function DateRangePopover({
         <Popover.Content
           align="end"
           sideOffset={6}
-          className="z-50 w-[300px] rounded-lg border border-border bg-surface p-1.5 shadow-overlay"
+          collisionPadding={DROPDOWN_COLLISION_PADDING}
+          className={cn(popoverSurface, "w-[300px]")}
         >
           <ul role="listbox" aria-label={t("dateRange")}>
             {presets.map((p) => {

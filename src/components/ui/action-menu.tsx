@@ -4,6 +4,7 @@ import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import type { ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils/cn";
+import { DROPDOWN_COLLISION_PADDING, menuSurface } from "./dropdown";
 
 export interface ActionMenuItem {
   icon?: ReactNode;
@@ -37,7 +38,8 @@ export function ActionMenu({ trigger, groups, header, align = "end", open, onOpe
         <Dropdown.Content
           align={align}
           sideOffset={6}
-          className="z-50 min-w-[240px] rounded-lg border border-border bg-surface p-1.5 shadow-overlay"
+          collisionPadding={DROPDOWN_COLLISION_PADDING}
+          className={cn(menuSurface, "min-w-[240px]")}
         >
           {header && (
             <>

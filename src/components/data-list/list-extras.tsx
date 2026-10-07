@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils/cn";
 import { toneClasses, type Tone } from "@/components/ui/badge";
 import { Checkbox, Field, TextInput } from "@/components/forms/fields";
 import { Button } from "@/components/ui/button";
+import { DROPDOWN_COLLISION_PADDING, menuSurface } from "@/components/ui/dropdown";
 import { DialogContent, DialogRoot } from "@/components/feedback/dialog";
 import { toast } from "@/components/feedback/toast";
 
@@ -160,7 +161,8 @@ export function ColumnsMenu({
         <Dropdown.Content
           align="end"
           sideOffset={6}
-          className="z-50 min-w-[220px] rounded-lg border border-border bg-surface p-1.5 shadow-overlay"
+          collisionPadding={DROPDOWN_COLLISION_PADDING}
+          className={cn(menuSurface, "min-w-[220px]")}
         >
           <Dropdown.Label className="px-2 py-1 text-11 font-medium text-muted uppercase">
             {t("showColumns")}
@@ -317,7 +319,8 @@ export function SavedViewsMenu({
         <Dropdown.Content
           align="end"
           sideOffset={6}
-          className="z-50 w-[260px] rounded-lg border border-border bg-surface p-1.5 shadow-overlay"
+          collisionPadding={DROPDOWN_COLLISION_PADDING}
+          className={cn(menuSurface, "w-[260px]")}
         >
           {group(t("myViews"), mine)}
           <Dropdown.Separator className="-mx-1.5 my-1 h-px bg-border" />

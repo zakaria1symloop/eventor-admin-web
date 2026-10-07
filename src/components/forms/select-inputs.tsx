@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import { DROPDOWN_COLLISION_PADDING, dropdownList, popoverListSurface } from "@/components/ui/dropdown";
 import { cn } from "@/lib/utils/cn";
 
 export interface Option {
@@ -45,9 +46,17 @@ function OptionRow({
         >
           {selected && <Check className="size-3" strokeWidth={3} />}
         </span>
-        <span className="min-w-0">
-          <span className="block truncate">{option.label}</span>
-          {option.sub && <span className="block truncate text-12 text-muted">{option.sub}</span>}
+        <span className="min-w-0 flex-1">
+          {/* Long names wrap instead of being cut; the second line (email…) stays on one line. */}
+          <span className="block break-words">{option.label}</span>
+          {option.sub && (
+            <span
+              className="block truncate text-12 text-muted"
+              title={typeof option.sub === "string" ? option.sub : undefined}
+            >
+              {option.sub}
+            </span>
+          )}
         </span>
       </button>
     </li>
@@ -87,7 +96,7 @@ export function MultiSelect({
     onValueChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v]);
 
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root open={open} onOpenChange={setOpen} modal>
       <Popover.Trigger asChild disabled={disabled}>
         <button type="button" {...aria} className={triggerClass}>
           <span className="flex min-w-0 flex-1 flex-wrap gap-1">
@@ -97,9 +106,10 @@ export function MultiSelect({
               return (
                 <span
                   key={v}
-                  className="inline-flex h-6 items-center gap-1 rounded-sm bg-brand-soft ps-2 pe-1 text-12 font-medium text-brand"
+                  title={label}
+                  className="inline-flex h-6 max-w-full items-center gap-1 rounded-sm bg-brand-soft ps-2 pe-1 text-12 font-medium text-brand"
                 >
-                  {label}
+                  <span className="truncate">{label}</span>
                   <span
                     role="button"
                     tabIndex={-1}
@@ -109,7 +119,7 @@ export function MultiSelect({
                       e.stopPropagation();
                       toggle(v);
                     }}
-                    className="flex size-4 items-center justify-center rounded-full hover:bg-brand/10"
+                    className="flex size-4 shrink-0 items-center justify-center rounded-full hover:bg-brand/10"
                   >
                     <X className="size-3" aria-hidden />
                   </span>
@@ -124,11 +134,12 @@ export function MultiSelect({
         <Popover.Content
           align="start"
           sideOffset={6}
+          collisionPadding={DROPDOWN_COLLISION_PADDING}
           style={{ width: "var(--radix-popover-trigger-width)" }}
-          className="z-50 min-w-[220px] rounded-lg border border-border bg-surface p-1.5 shadow-overlay"
+          className={cn(popoverListSurface, "min-w-[220px]")}
         >
           {searchable && <SearchBox value={q} onChange={setQ} placeholder={t("search")} />}
-          <ul role="listbox" aria-multiselectable className="max-h-64 overflow-y-auto">
+          <ul role="listbox" aria-multiselectable className={dropdownList}>
             {shown.map((o) => (
               <OptionRow
                 key={o.value}
@@ -146,7 +157,8 @@ export function MultiSelect({
   );
 }
 
-function SearchBox({
+/** The search box at the top of a dropdown list (also used by the list filters). */
+export function SearchBox({
   value,
   onChange,
   placeholder,
@@ -156,7 +168,7 @@ function SearchBox({
   placeholder: string;
 }) {
   return (
-    <label className="relative mb-1 block">
+    <label className="relative mb-1 block shrink-0">
       <span className="sr-only">{placeholder}</span>
       <Search
         aria-hidden
@@ -218,10 +230,10 @@ export function AsyncSelect({
   });
 
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root open={open} onOpenChange={setOpen} modal>
       <Popover.Trigger asChild disabled={disabled}>
         <button type="button" {...aria} className={cn(triggerClass, "px-3")}>
-          <span className={cn("min-w-0 flex-1 truncate", !value && "text-faint")}>
+          <span className={cn("min-w-0 flex-1 truncate", !value && "text-faint")} title={value?.label}>
             {value ? value.label : (placeholder ?? t("search"))}
           </span>
           {value && (
@@ -246,11 +258,12 @@ export function AsyncSelect({
         <Popover.Content
           align="start"
           sideOffset={6}
+          collisionPadding={DROPDOWN_COLLISION_PADDING}
           style={{ width: "var(--radix-popover-trigger-width)" }}
-          className="z-50 min-w-[240px] rounded-lg border border-border bg-surface p-1.5 shadow-overlay"
+          className={cn(popoverListSurface, "min-w-[240px]")}
         >
           <SearchBox value={q} onChange={setQ} placeholder={t("search")} />
-          <ul role="listbox" className="max-h-64 overflow-y-auto" aria-busy={query.isFetching || undefined}>
+          <ul role="listbox" className={dropdownList} aria-busy={query.isFetching || undefined}>
             {debounced.length < minChars ? (
               <li className="px-2 py-3 text-13 text-muted">{t("typeToSearch", { count: minChars })}</li>
             ) : query.isPending ? (

@@ -6,6 +6,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
 import { Select } from "@/components/forms/fields";
+import { SearchBox } from "@/components/forms/select-inputs";
+import { DROPDOWN_COLLISION_PADDING, dropdownList, popoverListSurface } from "@/components/ui/dropdown";
 import type { FilterConfig } from "./use-list-state";
 
 /* ------------------------------------------------------------------ SearchInput (debounced) */
@@ -72,10 +74,15 @@ export function FilterSelect({
   value: string | string[] | undefined;
   onChange: (value: string | string[] | null) => void;
 }) {
+  const tf = useTranslations("forms");
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
   const selected = Array.isArray(value) ? value : value ? [value] : [];
   const isSet = selected.length > 0;
   const labels = selected.map((v) => filter.options.find((o) => o.value === v)?.label ?? v);
+  // Long lists (clients, providers, wilayas…) get a search box.
+  const searchable = filter.options.length > 8;
+  const shown = q ? filter.options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase())) : filter.options;
 
   function toggle(v: string) {
     if (filter.multiple) {
@@ -87,7 +94,14 @@ export function FilterSelect({
   }
 
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setQ("");
+      }}
+      modal
+    >
       <Popover.Trigger
         className={cn(
           "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-13 whitespace-nowrap transition-colors",
@@ -112,10 +126,17 @@ export function FilterSelect({
         <Popover.Content
           align="start"
           sideOffset={6}
-          className="z-50 min-w-[200px] rounded-lg border border-border bg-surface p-1.5 shadow-overlay"
+          collisionPadding={DROPDOWN_COLLISION_PADDING}
+          className={cn(popoverListSurface, "w-max min-w-[220px] max-w-[min(320px,calc(100vw-16px))]")}
         >
-          <ul role="listbox" aria-label={filter.label} aria-multiselectable={filter.multiple || undefined}>
-            {filter.options.map((o) => {
+          {searchable && <SearchBox value={q} onChange={setQ} placeholder={tf("search")} />}
+          <ul
+            role="listbox"
+            aria-label={filter.label}
+            aria-multiselectable={filter.multiple || undefined}
+            className={dropdownList}
+          >
+            {shown.map((o) => {
               const on = selected.includes(o.value);
               return (
                 <li key={o.value}>
@@ -124,22 +145,23 @@ export function FilterSelect({
                     role="option"
                     aria-selected={on}
                     onClick={() => toggle(o.value)}
-                    className="flex h-8 w-full items-center gap-2.5 rounded-sm px-2 text-start text-13 text-ink hover:bg-canvas"
+                    className="flex min-h-8 w-full items-center gap-2.5 rounded-sm px-2 py-1 text-start text-13 text-ink hover:bg-canvas"
                   >
                     <span
                       className={cn(
-                        "flex size-4 items-center justify-center rounded-xs border",
+                        "flex size-4 shrink-0 items-center justify-center rounded-xs border",
                         on ? "border-brand bg-brand text-white" : "border-[#CFCBD8]",
                         !filter.multiple && "rounded-full",
                       )}
                     >
                       {on && <Check className="size-3" strokeWidth={3} />}
                     </span>
-                    {o.label}
+                    <span className="min-w-0 flex-1 break-words">{o.label}</span>
                   </button>
                 </li>
               );
             })}
+            {shown.length === 0 && <li className="px-2 py-3 text-13 text-muted">{tf("noOptions")}</li>}
           </ul>
         </Popover.Content>
       </Popover.Portal>
