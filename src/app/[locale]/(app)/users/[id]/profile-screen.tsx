@@ -159,7 +159,7 @@ export function ProfileScreen({ id }: { id: string }) {
         : []),
       ...(provider
         ? []
-        : [{ icon: <CalendarDays />, label: tp("actions.createBooking"), href: `/bookings?new=1` }]),
+        : [{ icon: <CalendarDays />, label: tp("actions.createBooking"), href: `/bookings?new=1&forClient=${u.id}` }]),
     ],
     [
       ...(provider

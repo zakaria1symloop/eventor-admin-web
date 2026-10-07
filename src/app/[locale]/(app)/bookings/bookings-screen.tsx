@@ -115,6 +115,8 @@ export function BookingsScreen() {
   const queryClient = useQueryClient();
   const catalog = useCatalog();
   const [creating, setCreating] = useQueryState("new", parseAsString.withOptions({ history: "replace" }));
+  // Profile → Create booking: the client to pre-fill (`?client=` is the list filter).
+  const [forClient, setForClient] = useQueryState("forClient", parseAsString.withOptions({ history: "replace" }));
 
   const [statusChange, setStatusChange] = useState<{
     rows: StatusTarget[];
@@ -495,7 +497,16 @@ export function BookingsScreen() {
       {invoiceFor && (
         <InvoiceModal bookingId={invoiceFor} open onOpenChange={(o) => !o && setInvoiceFor(null)} />
       )}
-      <CreateBookingDrawer open={creating === "1"} onOpenChange={(o) => !o && void setCreating(null)} />
+      <CreateBookingDrawer
+        open={creating === "1"}
+        clientId={forClient}
+        onOpenChange={(o) => {
+          if (!o) {
+            void setCreating(null);
+            void setForClient(null);
+          }
+        }}
+      />
       <ExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}

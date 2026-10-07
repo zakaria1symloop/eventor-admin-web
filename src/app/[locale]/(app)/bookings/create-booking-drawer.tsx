@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Controller, useWatch, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
@@ -18,6 +19,7 @@ import { flattenSettings, getSettings, settingsKeys } from "@/lib/api/settings";
 import { getService, listServices, localTitle, serviceKeys } from "@/lib/api/services";
 import { listUsers, userKeys } from "@/lib/api/users";
 import { useCatalog } from "../services/use-service-options";
+import { useUser } from "../users/use-user";
 import { AvailabilityPicker } from "./availability-picker";
 
 const opt = z.object({ value: z.string(), label: z.string() }).nullable();
@@ -59,14 +61,24 @@ export function serviceQuantity(
   return 1;
 }
 
+type ClientOption = { value: string; label: string; sub?: string };
+
 export function CreateBookingDrawer({
   open,
   onOpenChange,
+  clientId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Pre-fills the client (profile → Actions → Create booking). Ignored unless it is a client. */
+  clientId?: string | null;
 }) {
   const t = useTranslations("bookings.create");
+  const preset = useUser(clientId);
+  const presetClient: ClientOption | null =
+    preset.data && preset.data.role === "client"
+      ? { value: preset.data.id, label: preset.data.fullName, sub: preset.data.email }
+      : null;
   const router = useRouter();
   const settings = useQuery({
     queryKey: settingsKeys.all,
@@ -88,7 +100,7 @@ export function CreateBookingDrawer({
       submitLabel={t("submit")}
       footerNote={t("footer")}
       defaultValues={{
-        client: null,
+        client: presetClient,
         kind: "service",
         service: null,
         pack: null,
@@ -126,13 +138,30 @@ export function CreateBookingDrawer({
         toast.success(t("created", { reference: detail.reference }));
         router.push(`/bookings/${detail.id}`);
       }}
-      fields={(form) => <CreateFields form={form as unknown as UseFormReturn<Values>} feeOf={feeOf} />}
+      fields={(form) => (
+        <CreateFields form={form as unknown as UseFormReturn<Values>} feeOf={feeOf} presetClient={presetClient} />
+      )}
     />
   );
 }
 
-function CreateFields({ form, feeOf }: { form: UseFormReturn<Values>; feeOf: (key: string) => number }) {
+function CreateFields({
+  form,
+  feeOf,
+  presetClient,
+}: {
+  form: UseFormReturn<Values>;
+  feeOf: (key: string) => number;
+  presetClient: ClientOption | null;
+}) {
   const t = useTranslations("bookings.create");
+  // The client may load after the drawer opened (direct link): fill it once, unless one was picked.
+  const presetApplied = useRef<string | null>(null);
+  useEffect(() => {
+    if (!presetClient || presetApplied.current === presetClient.value) return;
+    presetApplied.current = presetClient.value;
+    if (!form.getValues("client")) form.setValue("client", presetClient);
+  }, [form, presetClient]);
   const tc = useTranslations("common");
   const tp = useTranslations("packs");
   const locale = useLocale();
