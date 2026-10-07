@@ -29,7 +29,8 @@ export interface ServiceFormValues {
   onePerDay: boolean;
   maxGuests: number | null;
   /** Different clients who may book overlapping hours. */
-  concurrentClients: number | null;
+  /** "Allow several clients at the same time": ticked = no limit per time slot, unticked = one client. */
+  allowSimultaneous: boolean;
   /** Event dates the service can be booked for ("" = no limit). */
   availableFrom: string;
   availableUntil: string;
@@ -61,7 +62,7 @@ export const FIELD_ORDER = [
   "wilayaCodes",
   "onePerDay",
   "maxGuests",
-  "concurrentClients",
+  "allowSimultaneous",
   "availablePeriod",
   "hours",
 ] as const;
@@ -84,7 +85,7 @@ export function emptyServiceValues(): ServiceFormValues {
     priceType: "per_event",
     onePerDay: true,
     maxGuests: null,
-    concurrentClients: 1,
+    allowSimultaneous: false,
     availableFrom: "",
     availableUntil: "",
     hoursEnabled: false,
@@ -112,7 +113,7 @@ export function serviceToValues(s: ServiceDetail): ServiceFormValues {
     priceType: s.priceType,
     onePerDay: s.onePerDay,
     maxGuests: s.maxGuests,
-    concurrentClients: s.concurrentClients,
+    allowSimultaneous: s.allowSimultaneous,
     availableFrom: s.availableFrom ?? "",
     availableUntil: s.availableUntil ?? "",
     hoursEnabled: s.hours.length > 0,
@@ -156,7 +157,7 @@ export function valuesToBody(v: ServiceFormValues): Omit<CreateServiceBody, "pro
     priceType: v.priceType,
     onePerDay: v.onePerDay,
     maxGuests: v.maxGuests,
-    concurrentClients: v.concurrentClients ?? 1,
+    allowSimultaneous: v.allowSimultaneous,
     availableFrom: v.availableFrom || null,
     availableUntil: v.availableUntil || null,
     hours: v.hoursEnabled ? v.hours : [],
@@ -180,8 +181,6 @@ export function validateDraft(v: ServiceFormValues, t: Translate, providerId: st
   if (!v.text.title_en.trim()) errors.title_en = t("errors.titleEn");
   if (v.basePrice === null || v.basePrice < 0) errors.basePrice = t("errors.price");
   if (!v.categoryId) errors.categoryId = t("errors.category");
-  if (v.concurrentClients !== null && (v.concurrentClients < 1 || v.concurrentClients > 50))
-    errors.concurrentClients = t("errors.concurrentClients");
   if (v.availableFrom && v.availableUntil && v.availableUntil < v.availableFrom)
     errors.availablePeriod = t("errors.availablePeriod");
   if (v.hoursEnabled && v.hours.length === 0) errors.hours = t("errors.hoursEmpty");
@@ -217,7 +216,8 @@ const API_FIELD: Record<string, string> = {
   maxEventsPerDay: "onePerDay",
   onePerDay: "onePerDay",
   maxGuests: "maxGuests",
-  concurrentClients: "concurrentClients",
+  concurrentClients: "allowSimultaneous",
+  allowSimultaneous: "allowSimultaneous",
   availableFrom: "availablePeriod",
   availableUntil: "availablePeriod",
   hours: "hours",

@@ -513,7 +513,10 @@ function Details({
               { label: td("deposit"), value: td("depositNone") },
               { label: td("onePerDay"), value: s.onePerDay ? td("onePerDayYes") : td("onePerDayNo") },
               { label: td("maxGuests"), value: s.maxGuests ?? "—" },
-              { label: td("concurrentClients"), value: s.concurrentClients },
+              {
+                label: td("allowSimultaneous"),
+                value: s.allowSimultaneous ? td("allowSimultaneousYes") : td("allowSimultaneousNo"),
+              },
               { label: td("availablePeriod"), value: period },
               { label: td("hours"), value: hoursSummary },
             ]}

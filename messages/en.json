@@ -2148,14 +2148,16 @@
       "openBookings": "Open bookings list",
       "openReviews": "Open reviews list",
       "openActivityLog": "Open activity log",
-      "concurrentClients": "Clients at the same time",
       "availablePeriod": "Available for events",
       "hours": "Bookable hours",
       "anyTime": "Any time",
       "noLimit": "No limit",
       "onePerDay": "Only one booking per day",
       "onePerDayYes": "Yes",
-      "onePerDayNo": "No (no daily limit)"
+      "onePerDayNo": "No (no daily limit)",
+      "allowSimultaneous": "Several clients at the same time",
+      "allowSimultaneousYes": "Allowed",
+      "allowSimultaneousNo": "No (one client per time slot)"
     },
     "form": {
       "newTitle": "Add service",
@@ -2237,21 +2239,21 @@
         "price": "Enter a base price",
         "category": "Pick a category",
         "extra": "Each extra needs an English name, an Arabic name and a price",
-        "concurrentClients": "Between 1 and 50",
         "availablePeriod": "The end date can't be before the start date",
         "hoursEmpty": "Open at least one day, or turn set hours off",
         "hoursSameTime": "A range can't start and end at the same time"
       },
       "schedule": "Booking schedule",
       "scheduleHint": "When clients can book this service.",
-      "concurrentClients": "Clients at the same time",
-      "concurrentClientsHint": "How many different clients can book overlapping hours. Bookings without times only count toward “Only one booking per day”.",
       "availablePeriod": "Available for events from – to",
       "availablePeriodHint": "Leave empty for no limit. The service leaves the app after the last date.",
       "hoursToggle": "Only bookable at set hours",
       "hoursHint": "Clients must pick times inside these hours. Off: any time of day.",
       "onePerDay": "Only one booking per day",
-      "onePerDayHint": "Ticked: once a day has a pending or accepted booking, it is full. Unticked: no daily limit — only the hours and “clients at the same time” limit bookings."
+      "onePerDayHint": "Ticked: once a day has a pending or accepted booking, it is full. Unticked: no daily limit — only the hours and “Allow several clients at the same time” limit bookings.",
+      "allowSimultaneous": "Allow several clients at the same time",
+      "allowSimultaneousHint": "Ticked: different clients can book the same hours. Unticked: one client per time slot.",
+      "allowSimultaneousOnePerDay": "Has no effect while “Only one booking per day” is ticked."
     }
   },
   "packs": {

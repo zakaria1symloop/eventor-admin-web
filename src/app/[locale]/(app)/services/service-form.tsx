@@ -584,28 +584,28 @@ function ServiceFormInner({
           <Card id="schedule">
             <CardHeader title={t("schedule")} subtitle={t("scheduleHint")} />
             <CardBody className="flex flex-col gap-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div data-field="concurrentClients">
-                  <Field label={t("concurrentClients")} hint={t("concurrentClientsHint")} error={errors.concurrentClients}>
-                    <NumberInput
-                      name="concurrentClients"
-                      value={values.concurrentClients}
-                      onValueChange={(n) => set("concurrentClients", n)}
-                    />
-                  </Field>
-                </div>
-                <div data-field="availablePeriod">
-                  <Field label={t("availablePeriod")} hint={t("availablePeriodHint")} error={errors.availablePeriod}>
-                    <DateRangeInput
-                      aria-label={t("availablePeriod")}
-                      value={{ from: values.availableFrom, to: values.availableUntil }}
-                      onValueChange={(r) => {
-                        set("availableFrom", r.from);
-                        set("availableUntil", r.to);
-                      }}
-                    />
-                  </Field>
-                </div>
+              <div data-field="allowSimultaneous">
+                {/* With "Only one booking per day" ticked there is never a second booking to overlap. */}
+                <Checkbox
+                  checked={values.allowSimultaneous}
+                  disabled={values.onePerDay}
+                  onCheckedChange={(c) => set("allowSimultaneous", c)}
+                  label={t("allowSimultaneous")}
+                  description={values.onePerDay ? t("allowSimultaneousOnePerDay") : t("allowSimultaneousHint")}
+                />
+              </div>
+              {/* Its own row: two date inputs don't fit in half the card. */}
+              <div data-field="availablePeriod" className="max-w-xl">
+                <Field label={t("availablePeriod")} hint={t("availablePeriodHint")} error={errors.availablePeriod}>
+                  <DateRangeInput
+                    aria-label={t("availablePeriod")}
+                    value={{ from: values.availableFrom, to: values.availableUntil }}
+                    onValueChange={(r) => {
+                      set("availableFrom", r.from);
+                      set("availableUntil", r.to);
+                    }}
+                  />
+                </Field>
               </div>
               <div data-field="hours" className="flex flex-col gap-3">
                 <ToggleRow

@@ -79,14 +79,15 @@ describe("booking schedule (issues 3 #6–#8)", () => {
       hours: [],
       availableFrom: null,
       availableUntil: null,
-      concurrentClients: 1,
+      allowSimultaneous: false,
     });
     expect(
-      valuesToBody({ ...base(), hoursEnabled: true, hours, availableFrom: "2027-03-01", concurrentClients: 3 }),
-    ).toMatchObject({ hours, availableFrom: "2027-03-01", availableUntil: null, concurrentClients: 3 });
+      valuesToBody({ ...base(), hoursEnabled: true, hours, availableFrom: "2027-03-01", allowSimultaneous: true }),
+    ).toMatchObject({ hours, availableFrom: "2027-03-01", availableUntil: null, allowSimultaneous: true });
+    expect(valuesToBody(base())).not.toHaveProperty("concurrentClients");
   });
 
-  it("refuses a period that ends before it starts, no open day, equal times and a bad client count", () => {
+  it("refuses a period that ends before it starts, no open day and equal times", () => {
     const errors = validateDraft(
       {
         ...base(),
@@ -94,7 +95,6 @@ describe("booking schedule (issues 3 #6–#8)", () => {
         availableUntil: "2027-03-01",
         hoursEnabled: true,
         hours: [],
-        concurrentClients: 0,
       },
       t,
       "p1",
@@ -102,7 +102,6 @@ describe("booking schedule (issues 3 #6–#8)", () => {
     expect(errors).toMatchObject({
       availablePeriod: "msg:errors.availablePeriod",
       hours: "msg:errors.hoursEmpty",
-      concurrentClients: "msg:errors.concurrentClients",
     });
     const same = validateDraft(
       { ...base(), hoursEnabled: true, hours: [{ weekday: 1, startTime: "10:00", endTime: "10:00" }] },

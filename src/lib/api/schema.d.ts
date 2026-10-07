@@ -8620,10 +8620,15 @@ export interface components {
             /** @example 400 */
             maxGuests: number | null;
             /**
-             * @description Different clients who may book overlapping hours.
+             * @description "Allow several clients at the same time" is ticked.
+             * @example false
+             */
+            allowSimultaneous: boolean;
+            /**
+             * @description 1 = one client per time slot; null when `allowSimultaneous`.
              * @example 1
              */
-            concurrentClients: number;
+            concurrentClients: number | null;
             /**
              * Format: date
              * @description First event date it can be booked for.
@@ -8683,7 +8688,7 @@ export interface components {
             cancellationPolicyAr?: string | null;
             facts?: components["schemas"]["ServiceFactDto"][] | null;
             /**
-             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `concurrentClients` limit bookings). Wins over `maxEventsPerDay`.
+             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `allowSimultaneous` limit bookings). Wins over `maxEventsPerDay`.
              * @example true
              */
             onePerDay?: boolean;
@@ -8696,10 +8701,16 @@ export interface components {
             /** @example 400 */
             maxGuests?: number | null;
             /**
-             * @description Different clients who may book overlapping hours (default 1). Whole-day bookings only count against `maxEventsPerDay`.
+             * @description The provider's checkbox "Allow several clients at the same time": true = any number of different clients can book the same hours, false = one client per time slot (409 `SLOT_UNAVAILABLE` for the next). Default false. Wins over `concurrentClients`.
+             * @example false
+             */
+            allowSimultaneous?: boolean;
+            /**
+             * @deprecated
+             * @description Deprecated: send `allowSimultaneous`. null = no limit.
              * @example 1
              */
-            concurrentClients?: number;
+            concurrentClients?: number | null;
             /**
              * Format: date
              * @description First event date it can be booked for; null = no limit.
@@ -8781,7 +8792,7 @@ export interface components {
             /** @enum {string} */
             priceType?: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
             /**
-             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `concurrentClients` limit bookings). Wins over `maxEventsPerDay`.
+             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `allowSimultaneous` limit bookings). Wins over `maxEventsPerDay`.
              * @example true
              */
             onePerDay?: boolean;
@@ -8794,10 +8805,16 @@ export interface components {
             /** @example 400 */
             maxGuests?: number | null;
             /**
-             * @description Different clients who may book overlapping hours (default 1). Whole-day bookings only count against `maxEventsPerDay`.
+             * @description The provider's checkbox "Allow several clients at the same time": true = any number of different clients can book the same hours, false = one client per time slot (409 `SLOT_UNAVAILABLE` for the next). Default false. Wins over `concurrentClients`.
+             * @example false
+             */
+            allowSimultaneous?: boolean;
+            /**
+             * @deprecated
+             * @description Deprecated: send `allowSimultaneous`. null = no limit.
              * @example 1
              */
-            concurrentClients?: number;
+            concurrentClients?: number | null;
             /**
              * Format: date
              * @description First event date it can be booked for; null = no limit.
@@ -11917,10 +11934,15 @@ export interface components {
              */
             maxEventsPerDay: number | null;
             /**
-             * @description Different clients who may book overlapping hours (timed bookings).
+             * @description "Allow several clients at the same time": different clients may book the same hours.
+             * @example false
+             */
+            allowSimultaneous: boolean;
+            /**
+             * @description 1 = one client per time slot; null when `allowSimultaneous`.
              * @example 1
              */
-            concurrentClients: number;
+            concurrentClients: number | null;
             /**
              * Format: date
              * @description First event date it can be booked for.
@@ -11962,7 +11984,7 @@ export interface components {
              * @enum {string}
              */
             state: "available" | "busy" | "blocked";
-            /** @description Service calendars only (null for packs): the hours still free that day — the service hours minus partial blocks and moments already booked by `concurrentClients` clients. Empty unless `state` is `available`. */
+            /** @description Service calendars only (null for packs): the hours still free that day — the service hours minus partial blocks and moments already booked (unless `allowSimultaneous`). Empty unless `state` is `available`. */
             freeRanges: components["schemas"]["AppTimeRangeDto"][] | null;
         };
         AppAvailabilityDto: {
@@ -12937,7 +12959,7 @@ export interface components {
             cancellationPolicyAr?: string | null;
             facts?: components["schemas"]["ServiceFactDto"][] | null;
             /**
-             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `concurrentClients` limit bookings). Wins over `maxEventsPerDay`.
+             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `allowSimultaneous` limit bookings). Wins over `maxEventsPerDay`.
              * @example true
              */
             onePerDay?: boolean;
@@ -12950,10 +12972,16 @@ export interface components {
             /** @example 400 */
             maxGuests?: number | null;
             /**
-             * @description Different clients who may book overlapping hours (default 1). Whole-day bookings only count against `maxEventsPerDay`.
+             * @description The provider's checkbox "Allow several clients at the same time": true = any number of different clients can book the same hours, false = one client per time slot (409 `SLOT_UNAVAILABLE` for the next). Default false. Wins over `concurrentClients`.
+             * @example false
+             */
+            allowSimultaneous?: boolean;
+            /**
+             * @deprecated
+             * @description Deprecated: send `allowSimultaneous`. null = no limit.
              * @example 1
              */
-            concurrentClients?: number;
+            concurrentClients?: number | null;
             /**
              * Format: date
              * @description First event date it can be booked for; null = no limit.
@@ -13023,7 +13051,7 @@ export interface components {
             /** @enum {string} */
             priceType?: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
             /**
-             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `concurrentClients` limit bookings). Wins over `maxEventsPerDay`.
+             * @description The provider's checkbox "Only one booking per day": true = 1 booking a day, false = no daily limit (only the hours and `allowSimultaneous` limit bookings). Wins over `maxEventsPerDay`.
              * @example true
              */
             onePerDay?: boolean;
@@ -13036,10 +13064,16 @@ export interface components {
             /** @example 400 */
             maxGuests?: number | null;
             /**
-             * @description Different clients who may book overlapping hours (default 1). Whole-day bookings only count against `maxEventsPerDay`.
+             * @description The provider's checkbox "Allow several clients at the same time": true = any number of different clients can book the same hours, false = one client per time slot (409 `SLOT_UNAVAILABLE` for the next). Default false. Wins over `concurrentClients`.
+             * @example false
+             */
+            allowSimultaneous?: boolean;
+            /**
+             * @deprecated
+             * @description Deprecated: send `allowSimultaneous`. null = no limit.
              * @example 1
              */
-            concurrentClients?: number;
+            concurrentClients?: number | null;
             /**
              * Format: date
              * @description First event date it can be booked for; null = no limit.

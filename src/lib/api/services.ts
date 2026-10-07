@@ -171,7 +171,10 @@ export interface ServiceDetail extends ServiceRow {
   /** 1 when `onePerDay`; null = no daily limit. */
   maxEventsPerDay: number | null;
   maxGuests: number | null;
-  concurrentClients: number;
+  /** "Allow several clients at the same time" is ticked. */
+  allowSimultaneous: boolean;
+  /** 1 = one client per time slot; null when `allowSimultaneous`. */
+  concurrentClients: number | null;
   availableFrom: string | null;
   availableUntil: string | null;
   hours: ServiceHour[];
@@ -215,7 +218,8 @@ export interface CreateServiceBody {
   /** "Only one booking per day": true = 1 a day, false = no daily limit. */
   onePerDay?: boolean;
   maxGuests?: number | null;
-  concurrentClients?: number;
+  /** "Allow several clients at the same time": true = no limit per time slot, false = one client. */
+  allowSimultaneous?: boolean;
   availableFrom?: string | null;
   availableUntil?: string | null;
   hours?: ServiceHour[];
