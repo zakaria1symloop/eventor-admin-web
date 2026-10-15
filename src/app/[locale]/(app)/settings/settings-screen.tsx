@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Bell, CalendarDays, Camera, LayoutGrid, LifeBuoy, User, Wrench } from "lucide-react";
+import { BarChart3, Bell, CalendarDays, Camera, LayoutGrid, LifeBuoy,
+  Scale, User, Wrench } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { SectionNav } from "@/components/layout/detail";
@@ -19,6 +20,7 @@ const SECTIONS: { id: SettingSectionKey; icon: React.ReactNode }[] = [
   { id: "languages", icon: <LayoutGrid /> },
   { id: "notifications", icon: <Bell /> },
   { id: "support", icon: <LifeBuoy /> },
+  { id: "legal", icon: <Scale /> },
   { id: "maintenance", icon: <Wrench /> },
 ];
 

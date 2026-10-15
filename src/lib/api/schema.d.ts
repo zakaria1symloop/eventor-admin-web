@@ -297,7 +297,7 @@ export interface paths {
         };
         /**
          * Readiness
-         * @description Public. The database answers; `queue` and `mail` say which drivers are configured (`mail: "console"` means no SMTP — no email leaves the server).
+         * @description Public. The database answers; `queue`, `mail` and `push` say which drivers are configured (`mail: "console"` means no SMTP — no email leaves the server; `push: "log"` means no Firebase key — no push reaches a phone).
          */
         get: operations["HealthController_ready"];
         put?: never;
@@ -1303,7 +1303,7 @@ export interface paths {
         put?: never;
         /**
          * Remind the provider
-         * @description Pending bookings only (409 BOOKING_NOT_EDITABLE). Email + push (stub) to the provider, `reminder_sent_at` set; at most once per 12 h (429 REMINDER_TOO_SOON with Retry-After). Used by BKG-01, BKG-03.
+         * @description Pending bookings only (409 BOOKING_NOT_EDITABLE). Email, notification and push to the provider, `reminder_sent_at` set; at most once per 12 h (429 REMINDER_TOO_SOON with Retry-After). Used by BKG-01, BKG-03.
          */
         post: operations["AdminBookingsController_remind"];
         delete?: never;
@@ -3172,6 +3172,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/auth/delete-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete an account from the web
+         * @description Public route behind the "Delete my account" web page (`deleteAccountUrl` in `/app/config`, required by Google Play). The email and password of a client or provider account, then the same deletion as `DELETE /app/me`: 409 `ACCOUNT_HAS_ACTIVE_ITEMS` while an upcoming booking or an open dispute remains. Same lockout as sign-in. Blocked and unverified accounts can delete too.
+         */
+        post: operations["AppAuthController_deleteAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/auth/refresh": {
         parameters: {
             query?: never;
@@ -3448,6 +3468,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/me/device-tokens/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test push to my devices
+         * @description Setup check: sends "Eventor test notification" (`data.type = "test"`) to every device registered on this account and waits for the answer from FCM. `driver: "log"` means the server has no Firebase key yet; `sent: 0` with `devices > 0` means FCM refused the tokens (another Firebase project, or iOS without the APNs key).
+         */
+        post: operations["AppMeController_testPush"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/me/device-tokens/{token}": {
         parameters: {
             query?: never;
@@ -3567,6 +3607,50 @@ export interface paths {
          * @description Screen 16, swipe-to-delete. Removes one of **my** notifications for good (hard delete) — it will not come back on the next sync.
          */
         delete: operations["AppMeController_deleteNotification"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Users I blocked
+         * @description Profile · Blocked users, newest first. Unblock with `DELETE /app/me/blocks/{userId}`.
+         */
+        get: operations["AppMeController_listBlocks"];
+        put?: never;
+        /**
+         * Block a user
+         * @description From a chat, a provider profile or a review. Idempotent. Once either of two users blocked the other: no message either way (`POST …/messages` and starting a chat answer 403 `USER_BLOCKED`), no new booking request between them (`POST /app/bookings` answers 403 `USER_BLOCKED`), and their direct chat shows `blockedByMe` / `blockedMe` with `canWrite: false`. Bookings made before keep going (status changes, invoices, check-in, disputes). Reviews stay public (report them instead). Eventor support cannot be blocked.
+         */
+        post: operations["AppMeController_block"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/me/blocks/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unblock a user
+         * @description Chat and booking requests work again (unless the other user blocked you too).
+         */
+        delete: operations["AppMeController_unblock"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5312,6 +5396,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/legal/{doc}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Terms of Use or Privacy Policy
+         * @description Public. In the `Accept-Language` language (en / ar).
+         */
+        get: operations["LegalController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5326,7 +5430,7 @@ export interface components {
              * @example CATEGORY_HAS_SERVICES
              * @enum {string}
              */
-            code: "VALIDATION_FAILED" | "BAD_REQUEST" | "SORT_FIELD_NOT_ALLOWED" | "NOT_FOUND" | "ROUTE_NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "STALE_UPDATE" | "UNPROCESSABLE" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "AUTH_TOKEN_MISSING" | "AUTH_TOKEN_INVALID" | "AUTH_TOKEN_EXPIRED" | "FORBIDDEN" | "FORBIDDEN_ROLE" | "NOT_OWNER" | "ACCOUNT_BLOCKED" | "AUTH_SESSION_REVOKED" | "AUTH_SESSION_REPLACED" | "AUTH_REFRESH_INVALID" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "PASSWORD_WEAK" | "RESET_TOKEN_INVALID" | "RESET_TOKEN_EXPIRED" | "INVITATION_INVALID" | "INVITATION_EXPIRED" | "INVITATION_NOT_FOUND" | "INVITATION_EXISTS" | "EMAIL_TAKEN" | "CURRENT_PASSWORD_INVALID" | "SESSION_NOT_FOUND" | "ADMIN_NOT_FOUND" | "CANNOT_REMOVE_SELF" | "LAST_ADMIN" | "SETTING_UNKNOWN" | "SETTINGS_CONFIRM_REQUIRED" | "AUDIT_LOG_NOT_FOUND" | "EXPORT_NOT_FOUND" | "SAVED_VIEW_NOT_FOUND" | "SAVED_VIEW_NAME_TAKEN" | "CATEGORY_NOT_FOUND" | "SLUG_TAKEN" | "CATEGORY_HAS_SERVICES" | "CATEGORY_MOVE_TARGET_INVALID" | "WILAYA_NOT_FOUND" | "WILAYA_CLOSE_CONFIRM_REQUIRED" | "COMMUNE_NOT_FOUND" | "COMMUNE_EXISTS" | "COMMUNE_IN_USE" | "CSV_HEADER_INVALID" | "CSV_TOO_MANY_ROWS" | "USER_NOT_FOUND" | "PHONE_TAKEN" | "ROLE_IMMUTABLE" | "NOT_A_PROVIDER" | "USER_ALREADY_BLOCKED" | "USER_NOT_BLOCKED" | "ACCOUNT_HAS_ACTIVE_ITEMS" | "TYPED_NAME_MISMATCH" | "BULK_ACTION_REFUSED" | "NOTE_NOT_FOUND" | "DOCUMENT_NOT_FOUND" | "DOCUMENT_INVALID_TRANSITION" | "FILE_NOT_FOUND" | "FILE_URL_INVALID" | "FILE_URL_EXPIRED" | "FILE_TOO_LARGE" | "FILE_TYPE_NOT_ALLOWED" | "FILE_NOT_READY" | "SERVICE_NOT_FOUND" | "CATEGORY_HIDDEN" | "WILAYA_CLOSED" | "SERVICE_PUBLISH_INVALID" | "SERVICE_INVALID_TRANSITION" | "FEATURED_LIMIT" | "SERVICE_HAS_BOOKINGS" | "SERVICE_IN_PACKS" | "PHOTO_LIMIT_REACHED" | "PHOTO_NOT_FOUND" | "PHOTO_ORDER_INVALID" | "AVAILABILITY_BLOCK_NOT_FOUND" | "AVAILABILITY_BLOCK_NOT_REMOVABLE" | "AVAILABILITY_DATE_PAST" | "AVAILABILITY_SERVICE_INVALID" | "PACK_NOT_FOUND" | "PACK_SERVICE_NOT_FOUND" | "PACK_SERVICE_OTHER_PROVIDER" | "PACK_PUBLISH_INVALID" | "PACK_WILAYA_NOT_COVERED" | "PACK_INVALID_TRANSITION" | "PACK_HAS_BOOKINGS" | "BOOKING_NOT_FOUND" | "BOOKING_INVALID_TRANSITION" | "BOOKING_NOT_EDITABLE" | "DATE_UNAVAILABLE" | "MULTI_DAY_NOT_ALLOWED" | "BOOKING_TOO_LONG" | "SERVICE_TIMES_REQUIRED" | "OUTSIDE_SERVICE_HOURS" | "OUTSIDE_SERVICE_PERIOD" | "SLOT_UNAVAILABLE" | "BOOKING_DUPLICATE" | "SERVICE_UNAVAILABLE_FOR_BOOKING" | "PACK_UNAVAILABLE" | "PROVIDER_NOT_ACCEPTING" | "MIN_NOTICE" | "BOOKING_DATE_PAST" | "NOT_A_CLIENT" | "BOOKING_EXTRA_INVALID" | "BOOKING_TOTAL_NEGATIVE" | "COMMUNE_WILAYA_MISMATCH" | "ACADEMIC_REQUEST_NOT_FOUND" | "USE_RESCHEDULE" | "RESCHEDULE_NOT_FOUND" | "RESCHEDULE_NOT_PENDING" | "RESCHEDULE_PENDING_EXISTS" | "REMINDER_TOO_SOON" | "INVOICE_NOT_FOUND" | "CONVERSATION_NOT_FOUND" | "MESSAGE_NOT_FOUND" | "MESSAGE_INVALID_TRANSITION" | "CONVERSATION_CLOSED" | "CONVERSATION_NOT_CLOSED" | "CONVERSATION_ALREADY_CLOSED" | "PARTICIPANT_NOT_FOUND" | "RECIPIENT_INVALID" | "DISPUTE_NOT_FOUND" | "DISPUTE_ALREADY_OPEN" | "BOOKING_NOT_DISPUTABLE" | "DISPUTE_WINDOW_CLOSED" | "DISPUTE_INVALID_TRANSITION" | "DISPUTE_PARTY_INVALID" | "DISPUTE_EVIDENCE_LIMIT" | "EVIDENCE_FILE_INVALID" | "FORM_NOT_FOUND" | "FORM_CLOSED" | "FORM_VERSION_NOT_FOUND" | "FORM_SCHEMA_INVALID" | "FORM_TRANSLATION_MISSING" | "FORM_INVALID_TRANSITION" | "FORM_HAS_SUBMISSIONS" | "FORM_DEFAULT_REQUIRED" | "FORM_ANSWERS_INVALID" | "FORM_SUBMISSION_LIMIT" | "FORM_REQUIRES_ACCOUNT" | "CODE_INVALID" | "CODE_EXPIRED" | "CODE_RESEND_TOO_SOON" | "UPLOAD_TOKEN_INVALID" | "EDIT_LINK_INVALID" | "ACADEMIC_REQUEST_INVALID_TRANSITION" | "ACADEMIC_REQUEST_FIELDS_INVALID" | "PROPOSAL_NOT_FOUND" | "PROPOSAL_EXISTS" | "PROPOSAL_BOOKED" | "REQUESTER_NOT_CLIENT" | "REVIEW_NOT_FOUND" | "REVIEW_INVALID_TRANSITION" | "REVIEW_NO_OPEN_REPORTS" | "REVIEW_REPLY_NOT_FOUND" | "REVIEW_REPLY_INVALID_TRANSITION" | "REPORT_NOT_FOUND" | "REPORT_INVALID_TRANSITION" | "REPORT_NOT_CONVERTIBLE" | "MESSAGE_NO_OPEN_REPORTS" | "OVERVIEW_RANGE_INVALID" | "FORBIDDEN_AUDIENCE" | "EMAIL_NOT_VERIFIED" | "EMAIL_ALREADY_VERIFIED" | "PASSWORD_ALREADY_SET" | "ROLE_NOT_ALLOWED_IN_APP" | "PROVIDER_FIELDS_REQUIRED" | "PROVIDER_FIELDS_NOT_ALLOWED" | "PROVIDER_NOT_FOUND" | "FAVOURITE_NOT_FOUND" | "FAVOURITE_TARGET_INVALID" | "BUDGET_NOT_FOUND" | "BUDGET_ITEM_NOT_FOUND" | "BUDGET_ITEM_LIMIT" | "BUDGET_BOOKING_ALREADY_LINKED" | "NOTIFICATION_NOT_FOUND" | "DEVICE_TOKEN_NOT_FOUND" | "MONTH_INVALID" | "PROVIDER_NOT_VERIFIED" | "CHECK_IN_NOT_ALLOWED" | "CHECK_IN_TOO_EARLY" | "CHECK_IN_DISPUTED" | "REVIEW_EXISTS" | "REVIEW_NOT_ALLOWED" | "REVIEW_WINDOW_CLOSED" | "REVIEW_EDIT_WINDOW_CLOSED" | "REVIEW_REPLY_EXISTS" | "REPORT_TARGET_NOT_FOUND" | "NOT_A_PARTICIPANT" | "CONVERSATION_READ_ONLY" | "DISPUTE_NOT_WITHDRAWABLE" | "BOOKING_TAB_INVALID";
+            code: "VALIDATION_FAILED" | "BAD_REQUEST" | "SORT_FIELD_NOT_ALLOWED" | "NOT_FOUND" | "ROUTE_NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "STALE_UPDATE" | "UNPROCESSABLE" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "AUTH_TOKEN_MISSING" | "AUTH_TOKEN_INVALID" | "AUTH_TOKEN_EXPIRED" | "FORBIDDEN" | "FORBIDDEN_ROLE" | "NOT_OWNER" | "ACCOUNT_BLOCKED" | "AUTH_SESSION_REVOKED" | "AUTH_SESSION_REPLACED" | "AUTH_REFRESH_INVALID" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "PASSWORD_WEAK" | "RESET_TOKEN_INVALID" | "RESET_TOKEN_EXPIRED" | "INVITATION_INVALID" | "INVITATION_EXPIRED" | "INVITATION_NOT_FOUND" | "INVITATION_EXISTS" | "EMAIL_TAKEN" | "CURRENT_PASSWORD_INVALID" | "SESSION_NOT_FOUND" | "ADMIN_NOT_FOUND" | "CANNOT_REMOVE_SELF" | "LAST_ADMIN" | "SETTING_UNKNOWN" | "SETTINGS_CONFIRM_REQUIRED" | "AUDIT_LOG_NOT_FOUND" | "EXPORT_NOT_FOUND" | "SAVED_VIEW_NOT_FOUND" | "SAVED_VIEW_NAME_TAKEN" | "CATEGORY_NOT_FOUND" | "SLUG_TAKEN" | "CATEGORY_HAS_SERVICES" | "CATEGORY_MOVE_TARGET_INVALID" | "WILAYA_NOT_FOUND" | "WILAYA_CLOSE_CONFIRM_REQUIRED" | "COMMUNE_NOT_FOUND" | "COMMUNE_EXISTS" | "COMMUNE_IN_USE" | "CSV_HEADER_INVALID" | "CSV_TOO_MANY_ROWS" | "USER_NOT_FOUND" | "PHONE_TAKEN" | "ROLE_IMMUTABLE" | "NOT_A_PROVIDER" | "USER_ALREADY_BLOCKED" | "USER_NOT_BLOCKED" | "USER_BLOCKED" | "BLOCK_TARGET_INVALID" | "BLOCK_NOT_FOUND" | "ACCOUNT_HAS_ACTIVE_ITEMS" | "TYPED_NAME_MISMATCH" | "BULK_ACTION_REFUSED" | "NOTE_NOT_FOUND" | "DOCUMENT_NOT_FOUND" | "DOCUMENT_INVALID_TRANSITION" | "FILE_NOT_FOUND" | "FILE_URL_INVALID" | "FILE_URL_EXPIRED" | "FILE_TOO_LARGE" | "FILE_TYPE_NOT_ALLOWED" | "FILE_NOT_READY" | "SERVICE_NOT_FOUND" | "CATEGORY_HIDDEN" | "WILAYA_CLOSED" | "SERVICE_PUBLISH_INVALID" | "SERVICE_INVALID_TRANSITION" | "FEATURED_LIMIT" | "SERVICE_HAS_BOOKINGS" | "SERVICE_IN_PACKS" | "PHOTO_LIMIT_REACHED" | "PHOTO_NOT_FOUND" | "PHOTO_ORDER_INVALID" | "AVAILABILITY_BLOCK_NOT_FOUND" | "AVAILABILITY_BLOCK_NOT_REMOVABLE" | "AVAILABILITY_DATE_PAST" | "AVAILABILITY_SERVICE_INVALID" | "PACK_NOT_FOUND" | "PACK_SERVICE_NOT_FOUND" | "PACK_SERVICE_OTHER_PROVIDER" | "PACK_PUBLISH_INVALID" | "PACK_WILAYA_NOT_COVERED" | "PACK_INVALID_TRANSITION" | "PACK_HAS_BOOKINGS" | "BOOKING_NOT_FOUND" | "BOOKING_INVALID_TRANSITION" | "BOOKING_NOT_EDITABLE" | "DATE_UNAVAILABLE" | "MULTI_DAY_NOT_ALLOWED" | "BOOKING_TOO_LONG" | "SERVICE_TIMES_REQUIRED" | "OUTSIDE_SERVICE_HOURS" | "OUTSIDE_SERVICE_PERIOD" | "SLOT_UNAVAILABLE" | "BOOKING_DUPLICATE" | "SERVICE_UNAVAILABLE_FOR_BOOKING" | "PACK_UNAVAILABLE" | "PROVIDER_NOT_ACCEPTING" | "MIN_NOTICE" | "BOOKING_DATE_PAST" | "NOT_A_CLIENT" | "BOOKING_EXTRA_INVALID" | "BOOKING_TOTAL_NEGATIVE" | "COMMUNE_WILAYA_MISMATCH" | "ACADEMIC_REQUEST_NOT_FOUND" | "USE_RESCHEDULE" | "RESCHEDULE_NOT_FOUND" | "RESCHEDULE_NOT_PENDING" | "RESCHEDULE_PENDING_EXISTS" | "REMINDER_TOO_SOON" | "INVOICE_NOT_FOUND" | "CONVERSATION_NOT_FOUND" | "MESSAGE_NOT_FOUND" | "MESSAGE_INVALID_TRANSITION" | "CONVERSATION_CLOSED" | "CONVERSATION_NOT_CLOSED" | "CONVERSATION_ALREADY_CLOSED" | "PARTICIPANT_NOT_FOUND" | "RECIPIENT_INVALID" | "DISPUTE_NOT_FOUND" | "DISPUTE_ALREADY_OPEN" | "BOOKING_NOT_DISPUTABLE" | "DISPUTE_WINDOW_CLOSED" | "DISPUTE_INVALID_TRANSITION" | "DISPUTE_PARTY_INVALID" | "DISPUTE_EVIDENCE_LIMIT" | "EVIDENCE_FILE_INVALID" | "FORM_NOT_FOUND" | "FORM_CLOSED" | "FORM_VERSION_NOT_FOUND" | "FORM_SCHEMA_INVALID" | "FORM_TRANSLATION_MISSING" | "FORM_INVALID_TRANSITION" | "FORM_HAS_SUBMISSIONS" | "FORM_DEFAULT_REQUIRED" | "FORM_ANSWERS_INVALID" | "FORM_SUBMISSION_LIMIT" | "FORM_REQUIRES_ACCOUNT" | "CODE_INVALID" | "CODE_EXPIRED" | "CODE_RESEND_TOO_SOON" | "UPLOAD_TOKEN_INVALID" | "EDIT_LINK_INVALID" | "ACADEMIC_REQUEST_INVALID_TRANSITION" | "ACADEMIC_REQUEST_FIELDS_INVALID" | "PROPOSAL_NOT_FOUND" | "PROPOSAL_EXISTS" | "PROPOSAL_BOOKED" | "REQUESTER_NOT_CLIENT" | "REVIEW_NOT_FOUND" | "REVIEW_INVALID_TRANSITION" | "REVIEW_NO_OPEN_REPORTS" | "REVIEW_REPLY_NOT_FOUND" | "REVIEW_REPLY_INVALID_TRANSITION" | "REPORT_NOT_FOUND" | "REPORT_INVALID_TRANSITION" | "REPORT_NOT_CONVERTIBLE" | "MESSAGE_NO_OPEN_REPORTS" | "OVERVIEW_RANGE_INVALID" | "FORBIDDEN_AUDIENCE" | "EMAIL_NOT_VERIFIED" | "EMAIL_ALREADY_VERIFIED" | "PASSWORD_ALREADY_SET" | "ROLE_NOT_ALLOWED_IN_APP" | "PROVIDER_FIELDS_REQUIRED" | "PROVIDER_FIELDS_NOT_ALLOWED" | "PROVIDER_NOT_FOUND" | "FAVOURITE_NOT_FOUND" | "FAVOURITE_TARGET_INVALID" | "BUDGET_NOT_FOUND" | "BUDGET_ITEM_NOT_FOUND" | "BUDGET_ITEM_LIMIT" | "BUDGET_BOOKING_ALREADY_LINKED" | "NOTIFICATION_NOT_FOUND" | "DEVICE_TOKEN_NOT_FOUND" | "MONTH_INVALID" | "PROVIDER_NOT_VERIFIED" | "CHECK_IN_NOT_ALLOWED" | "CHECK_IN_TOO_EARLY" | "CHECK_IN_DISPUTED" | "REVIEW_EXISTS" | "REVIEW_NOT_ALLOWED" | "REVIEW_WINDOW_CLOSED" | "REVIEW_EDIT_WINDOW_CLOSED" | "REVIEW_REPLY_EXISTS" | "REPORT_TARGET_NOT_FOUND" | "NOT_A_PARTICIPANT" | "CONVERSATION_READ_ONLY" | "DISPUTE_NOT_WITHDRAWABLE" | "BOOKING_TAB_INVALID";
             /**
              * @description Translated with Accept-Language (en | ar).
              * @example This category still has 10 services.
@@ -5387,7 +5491,7 @@ export interface components {
              * @example decimal
              * @enum {string}
              */
-            type: "integer" | "decimal" | "boolean" | "string" | "email" | "url" | "phone" | "version" | "enum_list" | "object";
+            type: "integer" | "decimal" | "boolean" | "string" | "email" | "url" | "phone" | "version" | "text" | "enum_list" | "object";
             /** @example 0 */
             min: number | null;
             /** @example 50 */
@@ -5417,7 +5521,7 @@ export interface components {
              * @example commission
              * @enum {string}
              */
-            key: "commission" | "bookings" | "uploads" | "languages" | "notifications" | "support" | "maintenance";
+            key: "commission" | "bookings" | "uploads" | "languages" | "notifications" | "support" | "legal" | "maintenance";
             settings: components["schemas"]["SettingItemDto"][];
         };
         SettingsDto: {
@@ -5646,6 +5750,12 @@ export interface components {
              * @enum {string}
              */
             mail: "smtp" | "console";
+            /**
+             * @description `fcm` when the Firebase service-account key is loaded; `log` means pushes only reach the server log — no phone gets them.
+             * @example fcm
+             * @enum {string}
+             */
+            push: "fcm" | "log";
         };
         UpdateMeDto: {
             /** @example Sara Meziane */
@@ -11184,14 +11294,49 @@ export interface components {
              */
             platform: "android" | "ios" | "web";
         };
+        AppTestPushDto: {
+            /**
+             * @description `log`: the server has no Firebase key yet, so nothing reaches a phone (the push is only written to the server log).
+             * @example fcm
+             * @enum {string}
+             */
+            driver: "fcm" | "log";
+            /**
+             * @description Devices registered on this account.
+             * @example 1
+             */
+            devices: number;
+            /**
+             * @description Devices FCM accepted the push for.
+             * @example 1
+             */
+            sent: number;
+            /**
+             * @description Tokens FCM called invalid or expired: removed — register the current token again.
+             * @example 0
+             */
+            removed: number;
+        };
         AppNotificationPreferencesDto: {
-            /** @example true */
+            /**
+             * @description Push for bookings and disputes (`booking.*`, `dispute.*` except messages, `academic_request.*`).
+             * @example true
+             */
             pushBookings: boolean;
-            /** @example true */
+            /**
+             * @description Push for chat messages (`message.new`, `dispute.message`).
+             * @example true
+             */
             pushMessages: boolean;
-            /** @example true */
+            /**
+             * @description Push for new reviews (`review.new`).
+             * @example true
+             */
             pushReviews: boolean;
-            /** @example true */
+            /**
+             * @description Booking update emails. Invoices and security emails are always sent.
+             * @example true
+             */
             emailBookings: boolean;
             /** Format: date-time */
             updatedAt: string;
@@ -11210,7 +11355,7 @@ export interface components {
              * @example dispute.message
              * @enum {string}
              */
-            type: "dispute.opened" | "dispute.message" | "dispute.evidence_requested" | "dispute.resolved" | "dispute.closed" | "review.new" | "review.shown" | "review.hidden" | "review.redacted" | "review_reply.hidden" | "review_reply.shown" | "report.resolved" | "report.dismissed" | "academic_request.cancelled" | "verification.approved" | "verification.rejected";
+            type: "booking.requested" | "booking.accepted" | "booking.declined" | "booking.cancelled" | "booking.completed" | "booking.rescheduled" | "booking.reschedule_proposed" | "booking.reschedule_rejected" | "booking.price_changed" | "booking.reminder" | "booking.review_requested" | "dispute.opened" | "dispute.message" | "dispute.evidence_requested" | "dispute.resolved" | "dispute.closed" | "review.new" | "review.shown" | "review.hidden" | "review.redacted" | "review_reply.hidden" | "review_reply.shown" | "report.resolved" | "report.dismissed" | "academic_request.cancelled" | "verification.approved" | "verification.rejected";
             /** @example Dispute DSP-000012 */
             title: string;
             /** @example New message from Eventor support. */
@@ -11247,6 +11392,33 @@ export interface components {
             marked: number;
             /** @example 0 */
             unread: number;
+        };
+        AppBlockedUserDto: {
+            /**
+             * Format: uuid
+             * @description The blocked user.
+             */
+            id: string;
+            /**
+             * @description Business name for a provider, full name for a client.
+             * @example Studio Lumière
+             */
+            name: string;
+            avatarUrl: string | null;
+            /**
+             * @example provider
+             * @enum {string}
+             */
+            role: "client" | "provider";
+            /** Format: date-time */
+            blockedAt: string;
+        };
+        AppBlockUserDto: {
+            /**
+             * Format: uuid
+             * @description The client or provider to block (`other.id` of a chat, a provider id, a review author).
+             */
+            userId: string;
         };
         AppFavouriteDto: {
             /**
@@ -12306,10 +12478,29 @@ export interface components {
             supportEmail: string | null;
             /** @example +213555000000 */
             supportPhone: string | null;
-            /** @example https://eventor.dz/terms */
+            /**
+             * @description Terms of Use in the request language: the URL set in Settings when there is one, otherwise the Eventor page. Link it from sign-up ("By continuing you agree to…"), Settings and Help.
+             * @example https://admin.eventor.dz/en/legal/terms
+             */
             termsUrl: string | null;
-            /** @example https://eventor.dz/privacy */
+            /**
+             * @description Privacy Policy, same rules as `termsUrl`.
+             * @example https://admin.eventor.dz/en/legal/privacy
+             */
             privacyUrl: string | null;
+            /**
+             * @description Public web page to delete an account without the app (Google Play Data safety form). Deleting in the app stays `DELETE /app/me`.
+             * @example https://admin.eventor.dz/en/delete-account
+             */
+            deleteAccountUrl: string;
+            /**
+             * @description Store pages for the force-update screen (24), set in Settings · Maintenance; null until the app is published there.
+             * @example {
+             *       "android": "https://play.google.com/store/apps/details?id=com.symloop.eventor",
+             *       "ios": null
+             *     }
+             */
+            storeUrls: Record<string, never>;
             /**
              * @description Upload limits, so the app can refuse a file before sending it.
              * @example {
@@ -13282,10 +13473,20 @@ export interface components {
             unreadCount: number;
             booking: components["schemas"]["AppChatBookingDto"] | null;
             /**
-             * @description You may write here (open chat, account not blocked).
+             * @description You may write here: open chat, account not blocked by Eventor, and neither of you blocked the other.
              * @example true
              */
             canWrite: boolean;
+            /**
+             * @description You blocked the other person of this direct chat (`POST /app/me/blocks`): show "You blocked this user" and an Unblock button.
+             * @example false
+             */
+            blockedByMe: boolean;
+            /**
+             * @description The other person blocked you: show "You can’t reply to this conversation". Always false in support and dispute chats.
+             * @example false
+             */
+            blockedMe: boolean;
         };
         AppConversationDetailDto: {
             /** Format: uuid */
@@ -13304,10 +13505,20 @@ export interface components {
             unreadCount: number;
             booking: components["schemas"]["AppChatBookingDto"] | null;
             /**
-             * @description You may write here (open chat, account not blocked).
+             * @description You may write here: open chat, account not blocked by Eventor, and neither of you blocked the other.
              * @example true
              */
             canWrite: boolean;
+            /**
+             * @description You blocked the other person of this direct chat (`POST /app/me/blocks`): show "You blocked this user" and an Unblock button.
+             * @example false
+             */
+            blockedByMe: boolean;
+            /**
+             * @description The other person blocked you: show "You can’t reply to this conversation". Always false in support and dispute chats.
+             * @example false
+             */
+            blockedMe: boolean;
             participants: components["schemas"]["AppChatPersonDto"][];
             /**
              * @description True once the pair share an accepted or completed booking: contact details stop being masked from then on (status-rules §10).
@@ -13620,6 +13831,21 @@ export interface components {
         AppWithdrawDisputeDto: {
             /** @example We settled it directly with the provider. */
             note: string;
+        };
+        PublicLegalDto: {
+            /** @enum {string} */
+            doc: "terms" | "privacy";
+            /** @enum {string} */
+            lang: "en" | "ar";
+            /** @example Privacy Policy */
+            title: string;
+            /** @description Markdown-lite: `## ` headings, `- ` bullets, blank lines between paragraphs, `**bold**`. */
+            body: string;
+            /**
+             * Format: date-time
+             * @description When an admin last changed it (the draft date until then).
+             */
+            updatedAt: string;
         };
     };
     responses: never;
@@ -26396,6 +26622,75 @@ export interface operations {
             };
         };
     };
+    AppAuthController_deleteAccount: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppLoginDto"];
+            };
+        };
+        responses: {
+            /** @description Account deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `INVALID_CREDENTIALS`: The email or password is incorrect. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `ACCOUNT_HAS_ACTIVE_ITEMS`: This account has {upcomingBookings} accepted upcoming bookings and {openDisputes} open disputes. Resolve them first. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `ACCOUNT_LOCKED`: Too many failed attempts. Try again in {retryAfterSeconds} seconds.<br>`RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     AppAuthController_refresh: {
         parameters: {
             query?: never;
@@ -27487,6 +27782,56 @@ export interface operations {
             };
         };
     };
+    AppMeController_testPush: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppTestPushDto"];
+                    };
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     AppMeController_removeDevice: {
         parameters: {
             query?: never;
@@ -27884,6 +28229,208 @@ export interface operations {
                 };
             };
             /** @description `NOTIFICATION_NOT_FOUND`: This notification was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_listBlocks: {
+        parameters: {
+            query?: {
+                page?: components["schemas"]["Object"];
+                limit?: components["schemas"]["Object"];
+                /** @description `field:asc` or `field:desc`. Each endpoint lists the fields it can sort by. */
+                sort?: string;
+            };
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBlockedUserDto"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_block: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppBlockUserDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppBlockedUserDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `USER_NOT_FOUND`: The user was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BLOCK_TARGET_INVALID`: You cannot block this account. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppMeController_unblock: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unblocked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /**
+             * @description `AUTH_SESSION_REVOKED`: Your session has ended. Please sign in again.
+             *
+             *     `AUTH_TOKEN_MISSING`: Authentication is required.<br>`AUTH_TOKEN_INVALID`: The access token is invalid.<br>`AUTH_TOKEN_EXPIRED`: The access token has expired.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             *
+             *     `FORBIDDEN_ROLE`: Your account role cannot access this.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `BLOCK_NOT_FOUND`: You have not blocked this account. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -28857,6 +29404,8 @@ export interface operations {
                 q?: string;
                 /** @description Category chip (screen 11). Repeat the parameter to search several categories at once, like `wilaya`. */
                 categoryId?: string[];
+                /** @description Only the services of this provider: screen 13 "See all (N)", with `servicesCount` from `GET /app/providers/{id}` as the total. */
+                providerId?: string;
                 /** @description Repeat for several wilayas. */
                 wilaya?: number[];
                 /** @description DZD. */
@@ -29608,7 +30157,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `EMAIL_NOT_VERIFIED`: Verify your email address before signing in. */
+            /** @description `EMAIL_NOT_VERIFIED`: Verify your email address before signing in.<br>`USER_BLOCKED`: You cannot do this: one of you has blocked the other. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -33165,7 +33714,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `NOT_OWNER`: You do not own this item.<br>`CONVERSATION_READ_ONLY`: You cannot write in this conversation. */
+            /** @description `USER_BLOCKED`: You cannot do this: one of you has blocked the other.<br>`NOT_OWNER`: You do not own this item.<br>`CONVERSATION_READ_ONLY`: You cannot write in this conversation. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -33383,7 +33932,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `NOT_A_PARTICIPANT`: You are not part of this conversation.<br>`CONVERSATION_READ_ONLY`: You cannot write in this conversation. */
+            /** @description `NOT_A_PARTICIPANT`: You are not part of this conversation.<br>`USER_BLOCKED`: You cannot do this: one of you has blocked the other.<br>`CONVERSATION_READ_ONLY`: You cannot write in this conversation. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -34564,6 +35113,50 @@ export interface operations {
             };
             /** @description `DISPUTE_NOT_WITHDRAWABLE`: Only the person who opened a dispute can withdraw it, while it is still open. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    LegalController_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path: {
+                doc: "terms" | "privacy";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicLegalDto"];
+                    };
+                };
+            };
+            /** @description `NOT_FOUND`: The requested resource was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -16,6 +16,7 @@ export type SettingType =
   | "url"
   | "phone"
   | "version"
+  | "text"
   | "enum_list"
   | "object";
 
@@ -41,7 +42,7 @@ export interface SettingItem {
 }
 
 export type SettingSectionKey =
-  "commission" | "bookings" | "uploads" | "languages" | "notifications" | "support" | "maintenance";
+  "commission" | "bookings" | "uploads" | "languages" | "notifications" | "support" | "legal" | "maintenance";
 
 export interface SettingsSection {
   key: SettingSectionKey;

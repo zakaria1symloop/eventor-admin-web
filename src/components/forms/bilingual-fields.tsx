@@ -17,6 +17,8 @@ export interface BilingualFieldConfig {
   required?: boolean;
   placeholder?: { en?: string; ar?: string };
   maxLength?: number;
+  /** Textarea height for `multiline` (default 4). */
+  rows?: number;
 }
 
 export type BilingualValues = Record<string, string>;
@@ -111,7 +113,7 @@ export function BilingualFields({
             return (
               <Field key={key} label={f.label} required={f.required ?? true} error={errors[key]}>
                 {f.multiline ? (
-                  <Textarea {...common} rows={4} onChange={(e) => onChange(key, e.target.value)} />
+                  <Textarea {...common} rows={f.rows ?? 4} onChange={(e) => onChange(key, e.target.value)} />
                 ) : (
                   <TextInput {...common} onChange={(e) => onChange(key, e.target.value)} />
                 )}

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/feedback/banner";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { toast } from "@/components/feedback/toast";
-import { Field, Select, TextInput, Toggle } from "@/components/forms/fields";
+import { Field, Select, Textarea, TextInput, Toggle } from "@/components/forms/fields";
 import { NumberInput } from "@/components/forms/inputs";
 import { BilingualFields } from "@/components/forms/bilingual-fields";
 import { DiffList, FormFooter, type DiffRow } from "@/components/forms/editors";
@@ -219,6 +219,8 @@ export function SettingsSectionCard({
           <ul className="divide-y divide-border">
             {sectionKey === "maintenance" ? (
               <MaintenanceRows items={items} draft={draft} set={set} errors={errors} label={label} />
+            ) : sectionKey === "legal" ? (
+              <LegalRows draft={draft} set={set} errors={errors} />
             ) : (
               items.map((item) => (
                 <SettingRowFragment
@@ -472,6 +474,26 @@ function SettingRow({
         />
       );
     }
+    case "text":
+      return (
+        <Row
+          stacked
+          label={label}
+          hint={hint}
+          error={error}
+          htmlFor={id}
+          control={
+            <Textarea
+              id={id}
+              rows={12}
+              value={String(value ?? "")}
+              maxLength={item.maxLength ?? undefined}
+              aria-invalid={error ? true : undefined}
+              onChange={(e) => onChange(e.target.value)}
+            />
+          }
+        />
+      );
     case "object": {
       const v = (value ?? {}) as Record<string, string>;
       return (
@@ -602,6 +624,59 @@ function MaintenanceRows({
           }
         />
       )}
+    </>
+  );
+}
+
+/** Terms of Use and Privacy Policy, EN / AR, shown on the public pages the stores and the app link to. */
+function LegalRows({
+  draft,
+  set,
+  errors,
+}: {
+  draft: Draft;
+  set: (key: string, v: SettingValue) => void;
+  errors: Record<string, string>;
+}) {
+  const t = useTranslations("settings");
+  const locale = useLocale();
+  const docs = [
+    { name: "legal_terms", page: "terms" },
+    { name: "legal_privacy", page: "privacy" },
+  ] as const;
+  return (
+    <>
+      {docs.map(({ name, page }) => (
+        <Row
+          key={name}
+          stacked
+          label={t(`fields.${name}.label`)}
+          hint={
+            <>
+              {t("fields.legal.hint")}{" "}
+              <a
+                href={`/${locale}/legal/${page}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-brand hover:underline"
+              >
+                {t("fields.legal.open")}
+              </a>
+            </>
+          }
+          control={
+            <BilingualFields
+              fields={[{ name, label: t(`fields.${name}.label`), multiline: true, required: true, maxLength: 60_000, rows: 18 }]}
+              values={{
+                [`${name}_en`]: String(draft[`${name}_en`] ?? ""),
+                [`${name}_ar`]: String(draft[`${name}_ar`] ?? ""),
+              }}
+              errors={errors}
+              onChange={(key, v) => set(key, v)}
+            />
+          }
+        />
+      ))}
     </>
   );
 }

@@ -34,14 +34,17 @@ export function PublicFrame({
   title,
   children,
   back,
+  wide,
 }: {
   title?: ReactNode;
   children: ReactNode;
   back?: () => void;
+  /** Reading width for long pages (legal texts) instead of the phone-sized column. */
+  wide?: boolean;
 }) {
   return (
     <div className="min-h-dvh bg-canvas sm:px-4 sm:py-8">
-      <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-surface sm:min-h-0 sm:rounded-2xl sm:border sm:border-border">
+      <main className={`mx-auto flex min-h-dvh w-full ${wide ? "max-w-[760px]" : "max-w-[480px]"} flex-col bg-surface sm:min-h-0 sm:rounded-2xl sm:border sm:border-border`}>
         <header className="flex items-center gap-2 border-b border-border px-4 py-3.5">
           {back && (
             <button
