@@ -3183,9 +3183,29 @@ export interface paths {
         put?: never;
         /**
          * Delete an account from the web
-         * @description Public route behind the "Delete my account" web page (`deleteAccountUrl` in `/app/config`, required by Google Play). The email and password of a client or provider account, then the same deletion as `DELETE /app/me`: 409 `ACCOUNT_HAS_ACTIVE_ITEMS` while an upcoming booking or an open dispute remains. Same lockout as sign-in. Blocked and unverified accounts can delete too.
+         * @description Public route behind the "Delete my account" web page (`deleteAccountUrl` in `/app/config`, required by Google Play). The email and either the password or a code from `POST /app/auth/delete-account/code`, then the same deletion as `DELETE /app/me`: 409 `ACCOUNT_HAS_ACTIVE_ITEMS` while an upcoming booking or an open dispute remains. Same lockout as sign-in. Blocked and unverified accounts can delete too.
          */
         post: operations["AppAuthController_deleteAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/auth/delete-account/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Email a code to delete an account from the web
+         * @description Public route behind the web deletion page, for accounts without a password, a forgotten one, or a blocked account. **Always 202**, whether or not the address has an account. Emails a 6-digit code valid 15 min (one per 60 s); then send it as `code` to `POST /app/auth/delete-account`.
+         */
+        post: operations["AppAuthController_deletionCode"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11078,6 +11098,30 @@ export interface components {
             /** @example Sunflower42x */
             password: string;
         };
+        AppDeleteAccountDto: {
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+            /**
+             * @description Send this or `code`.
+             * @example Sunflower42x
+             */
+            password?: string;
+            /**
+             * @description The 6-digit code emailed by `POST /app/auth/delete-account/code` (valid 15 min, 5 tries).
+             * @example 284917
+             */
+            code?: string;
+        };
+        AppForgotPasswordDto: {
+            /**
+             * Format: email
+             * @example amina.benali@email.com
+             */
+            email: string;
+        };
         AppRefreshDto: {
             /**
              * @description The refresh token from the previous login / refresh response. Rotates on every use.
@@ -11088,13 +11132,6 @@ export interface components {
         AppLogoutDto: {
             /** @description The refresh token to revoke. When absent, the bearer token’s session is revoked. */
             refreshToken?: string;
-        };
-        AppForgotPasswordDto: {
-            /**
-             * Format: email
-             * @example amina.benali@email.com
-             */
-            email: string;
         };
         AppVerifyResetCodeDto: {
             /**
@@ -12000,6 +12037,11 @@ export interface components {
             /** Format: uuid */
             id: string;
             /**
+             * Format: uuid
+             * @description The reviewer’s user id: send it to `POST /app/me/blocks` to block them.
+             */
+            authorId: string;
+            /**
              * @description The author’s first name plus an initial — never the full name, email or phone.
              * @example Yasmine K.
              */
@@ -12252,7 +12294,13 @@ export interface components {
             /** @example 5 */
             servicesCount: number;
             services: components["schemas"]["AppServiceCardDto"][];
+            /** @description At most 6, most booked first; `packsCount` is the total. */
             packs: components["schemas"]["AppPackCardDto"][];
+            /**
+             * @description All visible packs of the provider: "See all" opens `GET /app/packs?providerId=` (same count as its `meta.total`).
+             * @example 8
+             */
+            packsCount: number;
             ratingBreakdown: components["schemas"]["AppRatingBucketDto"][];
             recentReviews: components["schemas"]["AppReviewDto"][];
             /**
@@ -13369,6 +13417,11 @@ export interface components {
         AppProviderReviewDto: {
             /** Format: uuid */
             id: string;
+            /**
+             * Format: uuid
+             * @description The reviewer’s user id: send it to `POST /app/me/blocks` to block them.
+             */
+            authorId: string;
             /** @example 5 */
             rating: number;
             /**
@@ -26633,7 +26686,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AppLoginDto"];
+                "application/json": components["schemas"]["AppDeleteAccountDto"];
             };
         };
         responses: {
@@ -26680,7 +26733,58 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
+            /** @description `CODE_INVALID`: The verification code is incorrect.<br>`CODE_EXPIRED`: The verification code has expired. Ask for a new one. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
             /** @description `ACCOUNT_LOCKED`: Too many failed attempts. Try again in {retryAfterSeconds} seconds.<br>`RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_deletionCode: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppForgotPasswordDto"];
+            };
+        };
+        responses: {
+            /** @description Accepted (says nothing about whether the account exists). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
             429: {
                 headers: {
                     [name: string]: unknown;

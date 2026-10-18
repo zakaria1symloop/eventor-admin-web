@@ -4339,7 +4339,6 @@
     "formHint": "Enter the email address and password you use to sign in to the Eventor app.",
     "email": "Email",
     "password": "Password",
-    "forgot": "Forgot it? Use \"Forgot password\" on the app's sign-in screen, then come back.",
     "understood": "I understand that my account will be deleted and this cannot be undone.",
     "submit": "Delete my account",
     "inApp": "How we handle your data:",
@@ -4352,7 +4351,16 @@
       "activeItems": "You have an upcoming booking or an open dispute. Finish or cancel it in the app first.",
       "admin": "Eventor team accounts can't be deleted here.",
       "rateLimited": "Too many requests. Wait a minute and try again.",
-      "generic": "Something went wrong. Please try again."
-    }
+      "generic": "Something went wrong. Please try again.",
+      "codeInvalid": "This code is not right. Check the latest email we sent.",
+      "codeExpired": "This code has expired or was tried too many times. Ask for a new one."
+    },
+    "useCode": "No password, forgot it, or account blocked? Use a code sent by email instead",
+    "usePassword": "Use my password instead",
+    "codeHint": "Enter the email address of your Eventor account. We send it a 6-digit code to confirm that the account is yours.",
+    "sendCode": "Email me a code",
+    "resendCode": "Send a new code",
+    "codeSent": "If this address has an Eventor account, a code is on its way. Check your inbox and spam folder.",
+    "code": "6-digit code"
   }
 }

@@ -4,12 +4,12 @@ import { CheckCircle2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Banner } from "@/components/feedback/banner";
-import { Checkbox, Field } from "@/components/forms/fields";
+import { Checkbox, Field, TextInput } from "@/components/forms/fields";
 import { EmailInput, PasswordInput } from "@/components/forms/inputs";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { ApiError } from "@/lib/api/errors";
-import { deleteAccountFromWeb } from "@/lib/api/legal";
+import { deleteAccountFromWeb, requestDeletionCode } from "@/lib/api/legal";
 import { PublicFrame } from "../f/public-form-screens";
 
 const SECTIONS = ["now", "later", "kept", "refused"] as const;
@@ -19,6 +19,11 @@ export function DeleteAccountScreen() {
   const t = useTranslations("deleteAccount");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // "password": sign in; "code": a code by email (no password, a forgotten one, or a blocked account).
+  const [mode, setMode] = useState<"password" | "code">("password");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [sending, setSending] = useState(false);
   const [understood, setUnderstood] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -29,13 +34,33 @@ export function DeleteAccountScreen() {
     setError(null);
     setPending(true);
     try {
-      await deleteAccountFromWeb(email.trim(), password);
+      await deleteAccountFromWeb(email.trim(), mode === "code" ? { code: code.trim() } : { password });
       setDone(true);
     } catch (err) {
       setError(message(err));
     } finally {
       setPending(false);
     }
+  }
+
+  async function sendCode() {
+    setError(null);
+    setSending(true);
+    try {
+      await requestDeletionCode(email.trim());
+      setCodeSent(true);
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function switchMode(next: "password" | "code") {
+    setMode(next);
+    setError(null);
+    setCodeSent(false);
+    setCode("");
   }
 
   function message(err: unknown): string {
@@ -47,6 +72,10 @@ export function DeleteAccountScreen() {
         const seconds = (err.details as { retryAfterSeconds?: number } | null)?.retryAfterSeconds ?? 900;
         return t("errors.locked", { minutes: Math.max(1, Math.ceil(seconds / 60)) });
       }
+      case "CODE_INVALID":
+        return t("errors.codeInvalid");
+      case "CODE_EXPIRED":
+        return t("errors.codeExpired");
       case "ACCOUNT_HAS_ACTIVE_ITEMS":
         return t("errors.activeItems");
       case "ROLE_NOT_ALLOWED_IN_APP":
@@ -84,21 +113,49 @@ export function DeleteAccountScreen() {
 
       <form onSubmit={submit} className="mt-6 space-y-4 border-t border-border pt-5" noValidate>
         <h2 className="text-16 font-semibold text-ink">{t("formTitle")}</h2>
-        <p className="text-13 text-muted">{t("formHint")}</p>
+        <p className="text-13 text-muted">{mode === "code" ? t("codeHint") : t("formHint")}</p>
         {error && <Banner tone="red" title={error} />}
+        {codeSent && !error && <Banner tone="green" title={t("codeSent")} />}
         <Field label={t("email")} required>
           <EmailInput autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
-        <Field label={t("password")} required hint={t("forgot")}>
-          <PasswordInput autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </Field>
+        {mode === "password" ? (
+          <Field label={t("password")} required>
+            <PasswordInput autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </Field>
+        ) : (
+          <div className="space-y-3">
+            <Button type="button" variant="secondary" className="w-full" loading={sending} disabled={email.trim() === ""} onClick={() => void sendCode()}>
+              {codeSent ? t("resendCode") : t("sendCode")}
+            </Button>
+            {codeSent && (
+              <Field label={t("code")} required>
+                <TextInput
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  dir="ltr"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                />
+              </Field>
+            )}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => switchMode(mode === "password" ? "code" : "password")}
+          className="text-13 font-medium text-brand hover:underline"
+        >
+          {mode === "password" ? t("useCode") : t("usePassword")}
+        </button>
         <Checkbox checked={understood} onCheckedChange={setUnderstood} label={t("understood")} />
         <Button
           type="submit"
           variant="danger"
           className="w-full"
           loading={pending}
-          disabled={!understood || email.trim() === "" || password === ""}
+          disabled={!understood || email.trim() === "" || (mode === "password" ? password === "" : code.length !== 6)}
         >
           {t("submit")}
         </Button>
