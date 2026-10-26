@@ -11817,6 +11817,60 @@ export interface components {
              */
             acceptingBookings: boolean;
         };
+        AppServiceCardDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description In the caller’s language.
+             * @example Wedding photo & video coverage
+             */
+            title: string;
+            /** @example Wedding photo & video coverage */
+            titleEn: string;
+            /** @example تغطية تصوير الأعراس */
+            titleAr: string;
+            category: components["schemas"]["AppCategoryRefDto"] | null;
+            /**
+             * @description DZD, 2 decimals.
+             * @example 45000.00
+             */
+            basePrice: string;
+            /**
+             * @example per_day
+             * @enum {string}
+             */
+            priceType: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
+            /**
+             * @description Price type in the caller’s language.
+             * @example per day
+             */
+            priceTypeLabel: string;
+            /** @example 4.80 */
+            avgRating: string;
+            /** @example 32 */
+            ratingCount: number;
+            /** @example 12 */
+            bookingsCount: number;
+            /**
+             * @description An admin featured it (dashboard "Feature on home"): show a "Featured" badge.
+             * @example false
+             */
+            isFeatured: boolean;
+            coverUrl: string | null;
+            /** @description Open wilayas the service covers. */
+            wilayas: components["schemas"]["AppWilayaRefDto"][];
+            provider: components["schemas"]["AppProviderSummaryDto"];
+            /**
+             * @description Always false for anonymous callers.
+             * @example false
+             */
+            isFavourite: boolean;
+            /**
+             * Format: uuid
+             * @description The caller’s favourite row over this service (null when not saved, or anonymous). Un-save with `DELETE /app/me/favourites/{favouriteId}` — or by target with `DELETE /app/me/favourites?serviceId=`.
+             */
+            favouriteId: string | null;
+        };
         AppPackCardDto: {
             /** Format: uuid */
             id: string;
@@ -11879,55 +11933,6 @@ export interface components {
              */
             favouriteId: string | null;
         };
-        AppServiceCardDto: {
-            /** Format: uuid */
-            id: string;
-            /**
-             * @description In the caller’s language.
-             * @example Wedding photo & video coverage
-             */
-            title: string;
-            /** @example Wedding photo & video coverage */
-            titleEn: string;
-            /** @example تغطية تصوير الأعراس */
-            titleAr: string;
-            category: components["schemas"]["AppCategoryRefDto"] | null;
-            /**
-             * @description DZD, 2 decimals.
-             * @example 45000.00
-             */
-            basePrice: string;
-            /**
-             * @example per_day
-             * @enum {string}
-             */
-            priceType: "per_event" | "per_hour" | "per_person" | "per_day" | "on_quote";
-            /**
-             * @description Price type in the caller’s language.
-             * @example per day
-             */
-            priceTypeLabel: string;
-            /** @example 4.80 */
-            avgRating: string;
-            /** @example 32 */
-            ratingCount: number;
-            /** @example 12 */
-            bookingsCount: number;
-            coverUrl: string | null;
-            /** @description Open wilayas the service covers. */
-            wilayas: components["schemas"]["AppWilayaRefDto"][];
-            provider: components["schemas"]["AppProviderSummaryDto"];
-            /**
-             * @description Always false for anonymous callers.
-             * @example false
-             */
-            isFavourite: boolean;
-            /**
-             * Format: uuid
-             * @description The caller’s favourite row over this service (null when not saved, or anonymous). Un-save with `DELETE /app/me/favourites/{favouriteId}` — or by target with `DELETE /app/me/favourites?serviceId=`.
-             */
-            favouriteId: string | null;
-        };
         AppHomeDto: {
             /** @example Amina Benali */
             fullName: string;
@@ -11942,6 +11947,8 @@ export interface components {
             /** @description The next 2 bookings ("Your bookings"). */
             upcomingBookings: components["schemas"]["AppHomeBookingDto"][];
             budget: components["schemas"]["AppHomeBudgetDto"];
+            /** @description "Featured": the services admins picked with "Feature on home" (at most 12), in their order, the same for every user. Empty when none is featured: hide the section. */
+            featuredServices: components["schemas"]["AppServiceCardDto"][];
             /** @description "Ready Packs". */
             packs: components["schemas"]["AppPackCardDto"][];
             /** @description "Providers near you": services in my wilaya, best rated first. */
@@ -12103,6 +12110,11 @@ export interface components {
             ratingCount: number;
             /** @example 12 */
             bookingsCount: number;
+            /**
+             * @description An admin featured it (dashboard "Feature on home"): show a "Featured" badge.
+             * @example false
+             */
+            isFeatured: boolean;
             coverUrl: string | null;
             /** @description Open wilayas the service covers. */
             wilayas: components["schemas"]["AppWilayaRefDto"][];
@@ -29521,6 +29533,8 @@ export interface operations {
                 eventDate?: string;
                 /** @description Matches the categories used by packs of that event type. */
                 eventType?: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
+                /** @description Only the featured services (the home "Featured" rail's "See all"); with the default sort they come in the admins' order. */
+                featured?: boolean;
                 /** @description Only services I marked as favourite (needs a token). */
                 favourite?: boolean;
                 /** @description `relevance` (search score, then rating), `price_asc`, `price_desc`, `rating`, `popular`, `newest`. */
