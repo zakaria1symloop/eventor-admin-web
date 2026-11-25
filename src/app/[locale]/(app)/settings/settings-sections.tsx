@@ -16,7 +16,10 @@ import { DiffList, FormFooter, type DiffRow } from "@/components/forms/editors";
 import { Link } from "@/i18n/navigation";
 import {
   confirmDiff,
+  flattenSettings,
+  getSettings,
   settingsKeys,
+  staleKeys,
   updateSettings,
   type InvoiceIssuer,
   type SettingDiff,
@@ -66,6 +69,16 @@ function toDraft(items: SettingItem[]): Draft {
   return Object.fromEntries(items.map((i) => [i.key, i.value]));
 }
 
+function toLoadedAt(items: SettingItem[]): Record<string, string | null> {
+  return Object.fromEntries(items.map((i) => [i.key, i.updatedAt]));
+}
+
+/** A 409 STALE_UPDATE on this card: the keys someone else changed, and whether the admin reloaded since. */
+interface Conflict {
+  keys: string[];
+  reloaded: boolean;
+}
+
 /* ------------------------------------------------------------------ section */
 
 export function SettingsSectionCard({
@@ -86,16 +99,42 @@ export function SettingsSectionCard({
 
   const baseJson = JSON.stringify(items.map((i) => [i.key, i.value, i.updatedAt]));
   const [lastBase, setLastBase] = useState(baseJson);
+  const [lastItems, setLastItems] = useState(items);
   const [draft, setDraft] = useState<Draft>(() => toDraft(items));
+  // L-07: the `updatedAt` each field's draft was edited against, sent as `expectedUpdatedAt`.
+  const [loadedAt, setLoadedAt] = useState(() => toLoadedAt(items));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [diff, setDiff] = useState<SettingDiff[] | null>(null);
-  const [stale, setStale] = useState(false);
+  const [conflict, setConflict] = useState<Conflict | null>(null);
+  const [reloading, setReloading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   if (baseJson !== lastBase) {
+    // Fresh server values (a save here or in another card, a reload). Untouched fields take them;
+    // fields the admin edited keep the unsaved input *and* the `updatedAt` it was based on, so a save
+    // after someone else's change still gets 409 STALE_UPDATE instead of silently overwriting it.
+    const prev = toDraft(lastItems);
+    const nextDraft: Draft = {};
+    const nextLoadedAt: Record<string, string | null> = {};
+    for (const item of items) {
+      const edited = item.key in draft && !same(prev[item.key], draft[item.key]);
+      const keep = edited && !same(draft[item.key], item.value);
+      nextDraft[item.key] = keep ? draft[item.key] : item.value;
+      nextLoadedAt[item.key] = keep ? (loadedAt[item.key] ?? null) : item.updatedAt;
+    }
     setLastBase(baseJson);
-    setDraft(toDraft(items));
-    setErrors({});
-    setStale(false);
+    setLastItems(items);
+    setDraft(nextDraft);
+    setLoadedAt(nextLoadedAt);
+    // Keep field errors only on fields that still hold unsaved input (`invoice_issuer.nif` → `invoice_issuer`).
+    const fresh = toDraft(items);
+    setErrors((cur) =>
+      Object.fromEntries(
+        Object.entries(cur).filter(([field]) => {
+          const key = field.split(".")[0];
+          return key in nextDraft && !same(nextDraft[key], fresh[key]);
+        }),
+      ),
+    );
   }
 
   const base = toDraft(items);
@@ -111,17 +150,52 @@ export function SettingsSectionCard({
     mutationFn: (opts: { confirm?: boolean; note?: string }) =>
       updateSettings({
         values: Object.fromEntries(changedKeys.map((k) => [k, draft[k]])),
-        expectedUpdatedAt: Object.fromEntries(
-          changedKeys.map((k) => [k, items.find((i) => i.key === k)?.updatedAt ?? null]),
-        ),
+        // Rule (a), "same setting only": the API compares only the keys sent, so editing different
+        // fields in two tabs saves both; the same field changed meanwhile gives 409 STALE_UPDATE.
+        expectedUpdatedAt: Object.fromEntries(changedKeys.map((k) => [k, loadedAt[k] ?? null])),
         ...(opts.confirm ? { confirm: true } : {}),
         ...(opts.note ? { note: opts.note } : {}),
       }),
     onSuccess: (data: Settings) => {
+      setConflict(null);
       queryClient.setQueryData(settingsKeys.detail(), data);
       toast.success(t("saved", { section: t(`sections.${sectionKey}`) }));
     },
   });
+
+  /** 409 STALE_UPDATE: nothing was saved; keep the admin's input and offer Reload. */
+  function showConflict(keys: string[]) {
+    setConflict({ keys: keys.length > 0 ? keys : changedKeys, reloaded: false });
+  }
+
+  /** Load the latest values, keep the admin's input on top (re-apply by saving, or discard). */
+  async function reload() {
+    if (!conflict) return;
+    setReloading(true);
+    try {
+      const fresh = flattenSettings(
+        await queryClient.fetchQuery({ queryKey: settingsKeys.detail(), queryFn: getSettings, staleTime: 0 }),
+      );
+      // The admin now sees the latest values: saving re-applies their input over them.
+      setLoadedAt((cur) => ({
+        ...cur,
+        ...Object.fromEntries(conflict.keys.filter((k) => fresh[k]).map((k) => [k, fresh[k].updatedAt])),
+      }));
+      setConflict({ keys: conflict.keys, reloaded: true });
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setReloading(false);
+    }
+  }
+
+  function discard() {
+    setDraft(base);
+    setLoadedAt(toLoadedAt(items));
+    setErrors({});
+    setFormError(null);
+    setConflict(null);
+  }
 
   function handleError(e: unknown): boolean {
     const d = confirmDiff(e);
@@ -129,8 +203,9 @@ export function SettingsSectionCard({
       setDiff(d.length > 0 ? d : changedKeys.map((k) => ({ key: k, old: base[k], new: draft[k] })));
       return true;
     }
-    if (e instanceof ApiError && e.code === "STALE_UPDATE") {
-      setStale(true);
+    const stale = staleKeys(e);
+    if (stale) {
+      showConflict(stale);
       return true;
     }
     if (e instanceof ApiError && e.fieldErrors.length > 0) {
@@ -188,26 +263,56 @@ export function SettingsSectionCard({
     <Card id={sectionKey} className="scroll-mt-24 overflow-hidden">
       <CardHeader title={t(`sections.${sectionKey}`)} subtitle={t(`sectionHints.${sectionKey}`)} />
       <form id={formId} onSubmit={submit} noValidate>
-        {(stale || formError) && (
-          <div className="px-[18px] pt-3">
-            {stale ? (
-              <Banner
-                tone="amber"
-                title={t("staleTitle")}
-                description={t("staleDescription")}
-                action={
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => void queryClient.invalidateQueries({ queryKey: settingsKeys.all })}
-                  >
-                    {t("reload")}
-                  </Button>
-                }
-              />
-            ) : (
-              <Banner tone="red" title={formError} />
-            )}
+        {(conflict || formError) && (
+          <div className="flex flex-col gap-2 px-[18px] pt-3">
+            {conflict &&
+              (conflict.reloaded ? (
+                <Banner
+                  tone="amber"
+                  title={t("staleReloadedTitle")}
+                  description={
+                    <>
+                      <ul className="list-inside list-disc">
+                        {conflict.keys
+                          .map((k) => items.find((i) => i.key === k))
+                          .filter((i): i is SettingItem => !!i)
+                          .map((i) => (
+                            <li key={i.key}>
+                              {i.updatedBy
+                                ? t("staleKeyNowBy", {
+                                    field: label(i.key),
+                                    value: String(display(i.key, i.value) ?? "—"),
+                                    name: i.updatedBy.fullName,
+                                  })
+                                : t("staleKeyNow", {
+                                    field: label(i.key),
+                                    value: String(display(i.key, i.value) ?? "—"),
+                                  })}
+                            </li>
+                          ))}
+                      </ul>
+                      <p className="mt-1">{t("staleReloadedDescription")}</p>
+                    </>
+                  }
+                  action={
+                    <Button size="sm" variant="secondary" onClick={discard}>
+                      {t("discardMine")}
+                    </Button>
+                  }
+                />
+              ) : (
+                <Banner
+                  tone="amber"
+                  title={t("staleTitle")}
+                  description={t("staleDescription")}
+                  action={
+                    <Button size="sm" variant="secondary" loading={reloading} onClick={() => void reload()}>
+                      {t("reload")}
+                    </Button>
+                  }
+                />
+              ))}
+            {formError && <Banner tone="red" title={formError} />}
           </div>
         )}
         {items.length === 0 ? (
@@ -243,11 +348,7 @@ export function SettingsSectionCard({
           isDirty={dirty}
           isValid={!invalid}
           isSubmitting={save.isPending}
-          onDiscard={() => {
-            setDraft(base);
-            setErrors({});
-            setFormError(null);
-          }}
+          onDiscard={discard}
           note={
             lastChanged ? (
               <Link
@@ -278,8 +379,9 @@ export function SettingsSectionCard({
           try {
             await save.mutateAsync({ confirm: true, note: message.trim() || undefined });
           } catch (err) {
-            if (err instanceof ApiError && err.code === "STALE_UPDATE") {
-              setStale(true);
+            const stale = staleKeys(err);
+            if (stale) {
+              showConflict(stale);
               return;
             }
             throw err;

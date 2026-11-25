@@ -95,6 +95,13 @@ export function confirmDiff(error: unknown): SettingDiff[] | null {
   return Array.isArray(d?.diff) ? d.diff : [];
 }
 
+/** `details.keys` of a STALE_UPDATE error (the saved keys changed since they were loaded), or null. */
+export function staleKeys(error: unknown): string[] | null {
+  if (!(error instanceof ApiError) || error.code !== "STALE_UPDATE") return null;
+  const d = error.details as { keys?: unknown } | null;
+  return Array.isArray(d?.keys) ? d.keys.filter((k): k is string => typeof k === "string") : [];
+}
+
 export function flattenSettings(settings: Settings): Record<string, SettingItem> {
   const out: Record<string, SettingItem> = {};
   for (const s of settings.sections) for (const item of s.settings) out[item.key] = item;

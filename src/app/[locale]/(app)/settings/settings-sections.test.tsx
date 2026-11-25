@@ -11,9 +11,11 @@ vi.mock("@/i18n/navigation", () => ({
 }));
 
 const updateSettings = vi.fn();
+const getSettings = vi.fn();
 vi.mock("@/lib/api/settings", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/settings")>()),
   updateSettings: (...args: unknown[]) => updateSettings(...args),
+  getSettings: (...args: unknown[]) => getSettings(...args),
 }));
 
 const items: SettingItem[] = [
@@ -96,6 +98,152 @@ describe("SET-01 sensitive save", () => {
     await user.clear(input);
     await user.type(input, "11");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(await screen.findByText("These settings were changed by someone else")).toBeInTheDocument();
+    expect(
+      await screen.findByText("These settings were changed by someone else meanwhile"),
+    ).toBeInTheDocument();
+  });
+});
+
+/* L-07 — two tabs editing the same section (conflict rule (a): same setting only). */
+const T0 = "2026-11-20T08:00:00.000Z";
+const T1 = "2026-11-25T09:00:00.000Z";
+const bookingItems: SettingItem[] = [
+  {
+    key: "booking_min_notice_days",
+    value: 1,
+    type: "integer",
+    min: 0,
+    max: 30,
+    sensitive: false,
+    updatedAt: T0,
+    updatedBy: null,
+  },
+  {
+    key: "review_edit_hours",
+    value: 48,
+    type: "integer",
+    min: 0,
+    max: 168,
+    sensitive: false,
+    updatedAt: T0,
+    updatedBy: null,
+  },
+];
+/** What tab 1 saved meanwhile: minimum notice 1 → 3. */
+const afterTab1: SettingItem[] = [
+  { ...bookingItems[0], value: 3, updatedAt: T1, updatedBy: { id: "a2", fullName: "Sara Meziane" } },
+  bookingItems[1],
+];
+const staleError = () =>
+  new ApiError({
+    status: 409,
+    code: "STALE_UPDATE",
+    message: "Stale",
+    details: { keys: ["booking_min_notice_days"] },
+  });
+
+async function typeInto(user: ReturnType<typeof userEvent.setup>, label: string, value: string) {
+  const input = screen.getByLabelText(label);
+  await user.clear(input);
+  await user.type(input, value);
+}
+
+describe("L-07 settings changed in two tabs", () => {
+  beforeEach(() => {
+    updateSettings.mockReset();
+    getSettings.mockReset();
+  });
+
+  it("sends only the changed keys, each with the updatedAt it was loaded with", async () => {
+    const user = userEvent.setup();
+    updateSettings.mockResolvedValueOnce({ sections: [{ key: "bookings", settings: bookingItems }] });
+    renderWithProviders(
+      <SettingsSectionCard sectionKey="bookings" items={bookingItems} onDirtyChange={() => undefined} />,
+    );
+    await typeInto(user, "Review edit time", "24");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(updateSettings).toHaveBeenLastCalledWith({
+        values: { review_edit_hours: 24 },
+        expectedUpdatedAt: { review_edit_hours: T0 },
+      }),
+    );
+  });
+
+  it("keeps unsaved input and its loaded updatedAt when the data refreshes underneath", async () => {
+    const user = userEvent.setup();
+    updateSettings.mockRejectedValueOnce(staleError());
+    const { rerender } = renderWithProviders(
+      <SettingsSectionCard sectionKey="bookings" items={bookingItems} onDirtyChange={() => undefined} />,
+    );
+    await typeInto(user, "Minimum notice", "5");
+    // e.g. another card of this page saved and refreshed every section
+    rerender(<SettingsSectionCard sectionKey="bookings" items={afterTab1} onDirtyChange={() => undefined} />);
+    expect(screen.getByLabelText("Minimum notice")).toHaveValue("5");
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    // still checked against what the admin edited (T0), so the change made meanwhile is not overwritten
+    await waitFor(() =>
+      expect(updateSettings).toHaveBeenLastCalledWith({
+        values: { booking_min_notice_days: 5 },
+        expectedUpdatedAt: { booking_min_notice_days: T0 },
+      }),
+    );
+    expect(
+      await screen.findByText("These settings were changed by someone else meanwhile"),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Minimum notice")).toHaveValue("5");
+  });
+
+  it("Reload loads the latest values, keeps the input, and saving re-applies it", async () => {
+    const user = userEvent.setup();
+    updateSettings.mockRejectedValueOnce(staleError()).mockResolvedValueOnce({
+      sections: [
+        {
+          key: "bookings",
+          settings: [{ ...afterTab1[0], value: 5, updatedAt: "2026-11-25T09:05:00.000Z" }, afterTab1[1]],
+        },
+      ],
+    });
+    getSettings.mockResolvedValueOnce({ sections: [{ key: "bookings", settings: afterTab1 }] });
+    const { rerender } = renderWithProviders(
+      <SettingsSectionCard sectionKey="bookings" items={bookingItems} onDirtyChange={() => undefined} />,
+    );
+    await typeInto(user, "Minimum notice", "5");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(await screen.findByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(getSettings).toHaveBeenCalled());
+    // the settings screen passes the refetched items down
+    rerender(<SettingsSectionCard sectionKey="bookings" items={afterTab1} onDirtyChange={() => undefined} />);
+
+    expect(await screen.findByText("Latest values loaded: changed meanwhile")).toBeInTheDocument();
+    expect(screen.getByText("Minimum notice is now 3 days (changed by Sara Meziane)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Minimum notice")).toHaveValue("5");
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(updateSettings).toHaveBeenLastCalledWith({
+        values: { booking_min_notice_days: 5 },
+        expectedUpdatedAt: { booking_min_notice_days: T1 },
+      }),
+    );
+  });
+
+  it("Discard my changes goes back to the latest values", async () => {
+    const user = userEvent.setup();
+    updateSettings.mockRejectedValueOnce(staleError());
+    getSettings.mockResolvedValueOnce({ sections: [{ key: "bookings", settings: afterTab1 }] });
+    const { rerender } = renderWithProviders(
+      <SettingsSectionCard sectionKey="bookings" items={bookingItems} onDirtyChange={() => undefined} />,
+    );
+    await typeInto(user, "Minimum notice", "5");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(await screen.findByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(getSettings).toHaveBeenCalled());
+    rerender(<SettingsSectionCard sectionKey="bookings" items={afterTab1} onDirtyChange={() => undefined} />);
+
+    await user.click(await screen.findByRole("button", { name: "Discard my changes" }));
+    expect(screen.getByLabelText("Minimum notice")).toHaveValue("3");
+    expect(screen.queryByText("Latest values loaded: changed meanwhile")).not.toBeInTheDocument();
   });
 });
