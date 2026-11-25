@@ -119,7 +119,7 @@ export interface paths {
         put?: never;
         /**
          * Set a new password with a reset link
-         * @description Public route. Consumes the token and signs the admin out everywhere. Used by AUTH-03.
+         * @description Public route. Consumes the token and signs the account out everywhere. Used by AUTH-03. It also redeems the links an admin emails to an app account from the user page ("Email a reset link", `${APP_PUBLIC_URL}/reset-password?token=…`, 60 min, BUG-L3): the same dashboard page sends both here. It never signs anyone in.
          */
         post: operations["AdminAuthController_reset"];
         delete?: never;
@@ -1223,7 +1223,7 @@ export interface paths {
         put?: never;
         /**
          * Change the booking status
-         * @description pending → accepted | declined | cancelled; accepted → cancelled | completed; completed → `reopen` (accepted). Other moves: 409 BOOKING_INVALID_TRANSITION. `reason` is required except for accepted, `note` always. Admins may complete before the event date (flagged `earlyCompletion` in the audit). Effects: accept re-checks the date (409 DATE_UNAVAILABLE), availability `booked`, invoice issued (INV-YYYY-NNNN, issuer from `invoice_issuer`, PDF render job) and contact details unmasked in chat; decline / cancel release availability (cancel voids the invoice); complete sets `completed_at` and counters; reopen reverts them and withdraws the review request when no review exists. Status change row, audit and `booking.<status>` event; emails to client / provider when `notify`. Used by BKG-04.
+         * @description pending → accepted | declined | cancelled; accepted → cancelled | completed; completed → `reopen` (accepted). Other moves: 409 BOOKING_INVALID_TRANSITION. `reason` is required except for accepted, `note` always. Admins may complete before the event date (flagged `earlyCompletion` in the audit). Effects: accept re-checks the date (409 DATE_UNAVAILABLE; other accepted bookings on the same hours do not count), availability `booked`, invoice issued (INV-YYYY-NNNN, issuer from `invoice_issuer`, PDF render job) and contact details unmasked in chat; decline / cancel release availability (cancel voids the invoice); complete sets `completed_at` and counters; reopen reverts them and withdraws the review request when no review exists. Status change row, audit and `booking.<status>` event; emails to client / provider when `notify`. Used by BKG-04.
          */
         post: operations["AdminBookingsController_changeStatus"];
         delete?: never;
@@ -3332,6 +3332,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/auth/set-password/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check an emailed set-password link before showing the form
+         * @description Public route (BUG-L4), for the web page at `${APP_PUBLIC_URL}/set-password?token=…`: the same checks as `POST /app/auth/set-password`, without using the link. 200 with a first name and a masked email to greet the person; `RESET_TOKEN_INVALID` (unknown, already used or altered: "This link is not valid"), `RESET_TOKEN_EXPIRED` ("This link has expired, ask Eventor for a new one"), `ACCOUNT_BLOCKED` (details as at sign-in). The token goes in the body, not the URL, so it stays out of access logs.
+         */
+        post: operations["AppAuthController_checkSetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/me": {
         parameters: {
             query?: never;
@@ -3925,7 +3945,7 @@ export interface paths {
         };
         /**
          * Search services
-         * @description Public (a token adds `isFavourite` and enables `favourite=true`). The Search tab and screen 11a Filters. Only services visible in the app: published, provider active **and** verified, and at least one open wilaya. Anything else answers 404 rather than admitting it exists. `eventDate` keeps only providers with a free slot that day — no manual block and capacity left after held and booked events. Sort with `order`, not `sort`. Text comes back in the caller’s language: `Accept-Language: ar|en`, then the signed-in account’s `language`, then `en`. The `*En` / `*Ar` fields are always present too, for screens that show both.
+         * @description Public (a token adds `isFavourite` and enables `favourite=true`). The Search tab and screen 11a Filters. Only services visible in the app: published, provider active **and** verified, and at least one open wilaya. Anything else answers 404 rather than admitting it exists. `eventDate` keeps only the services whose calendar (`GET /app/services/{id}/availability`) shows that day as `available`: not blocked by the provider or by Eventor, inside the service's period, on a weekday it has hours for, with the daily limit not reached and at least one free hour left, and not before `firstBookableDate`. `meta.total` counts the services left. Sort with `order`, not `sort`. Text comes back in the caller’s language: `Accept-Language: ar|en`, then the signed-in account’s `language`, then `en`. The `*En` / `*Ar` fields are always present too, for screens that show both.
          */
         get: operations["AppCatalogController_services"];
         put?: never;
@@ -4211,7 +4231,7 @@ export interface paths {
         put?: never;
         /**
          * Cancel my booking
-         * @description status-rules §5: a client cancels a `pending` or an `accepted` booking. **No fee and no window are enforced** — payment is cash, the service’s own policy text (`cancellationPolicy` on the detail) is shown but not applied, and a disagreement becomes a dispute. The date is released and any invoice is voided.
+         * @description status-rules §5: a client cancels a `pending` or an `accepted` booking. **No fee and no window are enforced** — payment is cash, the service’s own policy text (`cancellationPolicy` on the detail) is shown but not applied, and a disagreement becomes a dispute. The date is released and any invoice is voided. Once an accepted event is over (the end time of its last day) it can no longer be cancelled: 409 `BOOKING_EVENT_OVER`, and `cancel` is gone from `allowedActions`; report a problem with a dispute instead.
          */
         post: operations["AppBookingsController_cancel"];
         delete?: never;
@@ -4231,7 +4251,7 @@ export interface paths {
         put?: never;
         /**
          * Propose another date
-         * @description status-rules §5 "Reschedule": either party proposes, the other accepts. On a **pending** booking the change is applied straight away; on an **accepted** one it becomes a proposal the provider answers with `/reschedules/{rid}/accept|reject`. Only one proposal can be open at a time.
+         * @description status-rules §5 "Reschedule": either party proposes, the other accepts. On a **pending** booking the change is applied straight away; on an **accepted** one it becomes a proposal the provider answers with `/reschedules/{rid}/accept|reject`. Only one proposal can be open at a time. Not once an accepted event is over (409 `BOOKING_EVENT_OVER`; `reschedule` is then gone from `allowedActions`).
          */
         post: operations["AppBookingsController_reschedule"];
         delete?: never;
@@ -4451,7 +4471,7 @@ export interface paths {
         put?: never;
         /**
          * Accept a booking request
-         * @description The **Accept** button on screen 21 (status-rules §5). The date is re-checked under a row lock, the hold becomes a booking, Eventor issues the invoice and contact details become visible in the chat. Only a **verified and active** provider can accept (422 `PROVIDER_NOT_VERIFIED`).
+         * @description The **Accept** button on screen 21 (status-rules §5). The date is re-checked under a row lock, the hold becomes a booking, Eventor issues the invoice and contact details become visible in the chat. Only a **verified and active** provider can accept (422 `PROVIDER_NOT_VERIFIED`). 409 `DATE_UNAVAILABLE` when a block or the daily limit now covers the date; the request then stays pending and `accept` is missing from its `allowedActions`. Other accepted bookings on the same hours do not stop an acceptance: the provider may take several clients in the same time frame (product decision, 24 Nov 2026).
          */
         post: operations["AppProviderController_accept"];
         delete?: never;
@@ -4491,7 +4511,7 @@ export interface paths {
         put?: never;
         /**
          * Cancel an accepted booking
-         * @description status-rules §5: no fee and no window are enforced (cash). The date is released and the invoice voided.
+         * @description status-rules §5: no fee and no window are enforced (cash). The date is released and the invoice voided. Not once the event is over (the end time of its last day): 409 `BOOKING_EVENT_OVER`, and `cancel` is gone from `allowedActions`.
          */
         post: operations["AppProviderController_cancel"];
         delete?: never;
@@ -4531,7 +4551,7 @@ export interface paths {
         put?: never;
         /**
          * Propose another date
-         * @description status-rules §5. A pending booking moves straight away; an accepted one waits for the client’s answer.
+         * @description status-rules §5. A pending booking moves straight away; an accepted one waits for the client’s answer. Not once an accepted event is over (409 `BOOKING_EVENT_OVER`; `reschedule` is then gone from `allowedActions`).
          */
         post: operations["AppProviderController_reschedule"];
         delete?: never;
@@ -5016,7 +5036,7 @@ export interface paths {
         post?: never;
         /**
          * Unblock a day
-         * @description Only a block **you** added: a booked or held day is not removable (409 `AVAILABILITY_BLOCK_NOT_REMOVABLE`).
+         * @description Only a block **you** added: a booked or held day is not removable (409 `AVAILABILITY_BLOCK_NOT_REMOVABLE`), and a block Eventor added (`source: admin`) is not yours (403 `AVAILABILITY_BLOCKED_BY_EVENTOR`).
          */
         delete: operations["AppProviderController_unblock"];
         options?: never;
@@ -5450,7 +5470,7 @@ export interface components {
              * @example CATEGORY_HAS_SERVICES
              * @enum {string}
              */
-            code: "VALIDATION_FAILED" | "BAD_REQUEST" | "SORT_FIELD_NOT_ALLOWED" | "NOT_FOUND" | "ROUTE_NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "STALE_UPDATE" | "UNPROCESSABLE" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "AUTH_TOKEN_MISSING" | "AUTH_TOKEN_INVALID" | "AUTH_TOKEN_EXPIRED" | "FORBIDDEN" | "FORBIDDEN_ROLE" | "NOT_OWNER" | "ACCOUNT_BLOCKED" | "AUTH_SESSION_REVOKED" | "AUTH_SESSION_REPLACED" | "AUTH_REFRESH_INVALID" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "PASSWORD_WEAK" | "RESET_TOKEN_INVALID" | "RESET_TOKEN_EXPIRED" | "INVITATION_INVALID" | "INVITATION_EXPIRED" | "INVITATION_NOT_FOUND" | "INVITATION_EXISTS" | "EMAIL_TAKEN" | "CURRENT_PASSWORD_INVALID" | "SESSION_NOT_FOUND" | "ADMIN_NOT_FOUND" | "CANNOT_REMOVE_SELF" | "LAST_ADMIN" | "SETTING_UNKNOWN" | "SETTINGS_CONFIRM_REQUIRED" | "AUDIT_LOG_NOT_FOUND" | "EXPORT_NOT_FOUND" | "SAVED_VIEW_NOT_FOUND" | "SAVED_VIEW_NAME_TAKEN" | "CATEGORY_NOT_FOUND" | "SLUG_TAKEN" | "CATEGORY_HAS_SERVICES" | "CATEGORY_MOVE_TARGET_INVALID" | "WILAYA_NOT_FOUND" | "WILAYA_CLOSE_CONFIRM_REQUIRED" | "COMMUNE_NOT_FOUND" | "COMMUNE_EXISTS" | "COMMUNE_IN_USE" | "CSV_HEADER_INVALID" | "CSV_TOO_MANY_ROWS" | "USER_NOT_FOUND" | "PHONE_TAKEN" | "ROLE_IMMUTABLE" | "NOT_A_PROVIDER" | "USER_ALREADY_BLOCKED" | "USER_NOT_BLOCKED" | "USER_BLOCKED" | "BLOCK_TARGET_INVALID" | "BLOCK_NOT_FOUND" | "ACCOUNT_HAS_ACTIVE_ITEMS" | "TYPED_NAME_MISMATCH" | "BULK_ACTION_REFUSED" | "NOTE_NOT_FOUND" | "DOCUMENT_NOT_FOUND" | "DOCUMENT_INVALID_TRANSITION" | "FILE_NOT_FOUND" | "FILE_URL_INVALID" | "FILE_URL_EXPIRED" | "FILE_TOO_LARGE" | "FILE_TYPE_NOT_ALLOWED" | "FILE_NOT_READY" | "SERVICE_NOT_FOUND" | "CATEGORY_HIDDEN" | "WILAYA_CLOSED" | "SERVICE_PUBLISH_INVALID" | "SERVICE_INVALID_TRANSITION" | "FEATURED_LIMIT" | "SERVICE_HAS_BOOKINGS" | "SERVICE_IN_PACKS" | "PHOTO_LIMIT_REACHED" | "PHOTO_NOT_FOUND" | "PHOTO_ORDER_INVALID" | "AVAILABILITY_BLOCK_NOT_FOUND" | "AVAILABILITY_BLOCK_NOT_REMOVABLE" | "AVAILABILITY_DATE_PAST" | "AVAILABILITY_SERVICE_INVALID" | "PACK_NOT_FOUND" | "PACK_SERVICE_NOT_FOUND" | "PACK_SERVICE_OTHER_PROVIDER" | "PACK_PUBLISH_INVALID" | "PACK_WILAYA_NOT_COVERED" | "PACK_INVALID_TRANSITION" | "PACK_HAS_BOOKINGS" | "BOOKING_NOT_FOUND" | "BOOKING_INVALID_TRANSITION" | "BOOKING_NOT_EDITABLE" | "DATE_UNAVAILABLE" | "MULTI_DAY_NOT_ALLOWED" | "BOOKING_TOO_LONG" | "SERVICE_TIMES_REQUIRED" | "OUTSIDE_SERVICE_HOURS" | "OUTSIDE_SERVICE_PERIOD" | "SLOT_UNAVAILABLE" | "BOOKING_DUPLICATE" | "SERVICE_UNAVAILABLE_FOR_BOOKING" | "PACK_UNAVAILABLE" | "PROVIDER_NOT_ACCEPTING" | "MIN_NOTICE" | "BOOKING_DATE_PAST" | "NOT_A_CLIENT" | "BOOKING_EXTRA_INVALID" | "BOOKING_TOTAL_NEGATIVE" | "COMMUNE_WILAYA_MISMATCH" | "ACADEMIC_REQUEST_NOT_FOUND" | "USE_RESCHEDULE" | "RESCHEDULE_NOT_FOUND" | "RESCHEDULE_NOT_PENDING" | "RESCHEDULE_PENDING_EXISTS" | "REMINDER_TOO_SOON" | "INVOICE_NOT_FOUND" | "CONVERSATION_NOT_FOUND" | "MESSAGE_NOT_FOUND" | "MESSAGE_INVALID_TRANSITION" | "CONVERSATION_CLOSED" | "CONVERSATION_NOT_CLOSED" | "CONVERSATION_ALREADY_CLOSED" | "PARTICIPANT_NOT_FOUND" | "RECIPIENT_INVALID" | "DISPUTE_NOT_FOUND" | "DISPUTE_ALREADY_OPEN" | "BOOKING_NOT_DISPUTABLE" | "DISPUTE_WINDOW_CLOSED" | "DISPUTE_INVALID_TRANSITION" | "DISPUTE_PARTY_INVALID" | "DISPUTE_EVIDENCE_LIMIT" | "EVIDENCE_FILE_INVALID" | "FORM_NOT_FOUND" | "FORM_CLOSED" | "FORM_VERSION_NOT_FOUND" | "FORM_SCHEMA_INVALID" | "FORM_TRANSLATION_MISSING" | "FORM_INVALID_TRANSITION" | "FORM_HAS_SUBMISSIONS" | "FORM_DEFAULT_REQUIRED" | "FORM_ANSWERS_INVALID" | "FORM_SUBMISSION_LIMIT" | "FORM_REQUIRES_ACCOUNT" | "CODE_INVALID" | "CODE_EXPIRED" | "CODE_RESEND_TOO_SOON" | "UPLOAD_TOKEN_INVALID" | "EDIT_LINK_INVALID" | "ACADEMIC_REQUEST_INVALID_TRANSITION" | "ACADEMIC_REQUEST_FIELDS_INVALID" | "PROPOSAL_NOT_FOUND" | "PROPOSAL_EXISTS" | "PROPOSAL_BOOKED" | "REQUESTER_NOT_CLIENT" | "REVIEW_NOT_FOUND" | "REVIEW_INVALID_TRANSITION" | "REVIEW_NO_OPEN_REPORTS" | "REVIEW_REPLY_NOT_FOUND" | "REVIEW_REPLY_INVALID_TRANSITION" | "REPORT_NOT_FOUND" | "REPORT_INVALID_TRANSITION" | "REPORT_NOT_CONVERTIBLE" | "MESSAGE_NO_OPEN_REPORTS" | "OVERVIEW_RANGE_INVALID" | "FORBIDDEN_AUDIENCE" | "EMAIL_NOT_VERIFIED" | "EMAIL_ALREADY_VERIFIED" | "PASSWORD_ALREADY_SET" | "ROLE_NOT_ALLOWED_IN_APP" | "PROVIDER_FIELDS_REQUIRED" | "PROVIDER_FIELDS_NOT_ALLOWED" | "PROVIDER_NOT_FOUND" | "FAVOURITE_NOT_FOUND" | "FAVOURITE_TARGET_INVALID" | "BUDGET_NOT_FOUND" | "BUDGET_ITEM_NOT_FOUND" | "BUDGET_ITEM_LIMIT" | "BUDGET_BOOKING_ALREADY_LINKED" | "NOTIFICATION_NOT_FOUND" | "DEVICE_TOKEN_NOT_FOUND" | "MONTH_INVALID" | "PROVIDER_NOT_VERIFIED" | "CHECK_IN_NOT_ALLOWED" | "CHECK_IN_TOO_EARLY" | "CHECK_IN_DISPUTED" | "REVIEW_EXISTS" | "REVIEW_NOT_ALLOWED" | "REVIEW_WINDOW_CLOSED" | "REVIEW_EDIT_WINDOW_CLOSED" | "REVIEW_REPLY_EXISTS" | "REPORT_TARGET_NOT_FOUND" | "NOT_A_PARTICIPANT" | "CONVERSATION_READ_ONLY" | "DISPUTE_NOT_WITHDRAWABLE" | "BOOKING_TAB_INVALID";
+            code: "VALIDATION_FAILED" | "BAD_REQUEST" | "SORT_FIELD_NOT_ALLOWED" | "NOT_FOUND" | "ROUTE_NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "STALE_UPDATE" | "UNPROCESSABLE" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "AUTH_TOKEN_MISSING" | "AUTH_TOKEN_INVALID" | "AUTH_TOKEN_EXPIRED" | "FORBIDDEN" | "FORBIDDEN_ROLE" | "NOT_OWNER" | "ACCOUNT_BLOCKED" | "AUTH_SESSION_REVOKED" | "AUTH_SESSION_REPLACED" | "AUTH_REFRESH_INVALID" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "PASSWORD_UNCHANGED" | "PASSWORD_WEAK" | "RESET_TOKEN_INVALID" | "RESET_TOKEN_EXPIRED" | "INVITATION_INVALID" | "INVITATION_EXPIRED" | "INVITATION_NOT_FOUND" | "INVITATION_EXISTS" | "EMAIL_TAKEN" | "CURRENT_PASSWORD_INVALID" | "SESSION_NOT_FOUND" | "ADMIN_NOT_FOUND" | "CANNOT_REMOVE_SELF" | "LAST_ADMIN" | "SETTING_UNKNOWN" | "SETTINGS_CONFIRM_REQUIRED" | "AUDIT_LOG_NOT_FOUND" | "EXPORT_NOT_FOUND" | "SAVED_VIEW_NOT_FOUND" | "SAVED_VIEW_NAME_TAKEN" | "CATEGORY_NOT_FOUND" | "SLUG_TAKEN" | "CATEGORY_HAS_SERVICES" | "CATEGORY_MOVE_TARGET_INVALID" | "WILAYA_NOT_FOUND" | "WILAYA_CLOSE_CONFIRM_REQUIRED" | "COMMUNE_NOT_FOUND" | "COMMUNE_EXISTS" | "COMMUNE_IN_USE" | "CSV_HEADER_INVALID" | "CSV_TOO_MANY_ROWS" | "USER_NOT_FOUND" | "PHONE_TAKEN" | "ROLE_IMMUTABLE" | "NOT_A_PROVIDER" | "USER_ALREADY_BLOCKED" | "USER_NOT_BLOCKED" | "USER_BLOCKED" | "BLOCK_TARGET_INVALID" | "BLOCK_NOT_FOUND" | "ACCOUNT_HAS_ACTIVE_ITEMS" | "TYPED_NAME_MISMATCH" | "BULK_ACTION_REFUSED" | "NOTE_NOT_FOUND" | "DOCUMENT_NOT_FOUND" | "DOCUMENT_INVALID_TRANSITION" | "FILE_NOT_FOUND" | "FILE_URL_INVALID" | "FILE_URL_EXPIRED" | "FILE_TOO_LARGE" | "FILE_TYPE_NOT_ALLOWED" | "FILE_NOT_READY" | "SERVICE_NOT_FOUND" | "CATEGORY_HIDDEN" | "WILAYA_CLOSED" | "SERVICE_PUBLISH_INVALID" | "SERVICE_INVALID_TRANSITION" | "FEATURED_LIMIT" | "SERVICE_HAS_BOOKINGS" | "SERVICE_IN_PACKS" | "PHOTO_LIMIT_REACHED" | "PHOTO_NOT_FOUND" | "PHOTO_ORDER_INVALID" | "AVAILABILITY_BLOCK_NOT_FOUND" | "AVAILABILITY_BLOCKED_BY_EVENTOR" | "AVAILABILITY_BLOCK_NOT_REMOVABLE" | "AVAILABILITY_DATE_PAST" | "AVAILABILITY_SERVICE_INVALID" | "PACK_NOT_FOUND" | "PACK_SERVICE_NOT_FOUND" | "PACK_SERVICE_OTHER_PROVIDER" | "PACK_PUBLISH_INVALID" | "PACK_WILAYA_NOT_COVERED" | "PACK_INVALID_TRANSITION" | "PACK_HAS_BOOKINGS" | "BOOKING_NOT_FOUND" | "BOOKING_INVALID_TRANSITION" | "BOOKING_EXPIRED" | "RECIPIENT_DELETED" | "COUNTERPARTY_UNAVAILABLE" | "BOOKING_EVENT_OVER" | "BOOKING_NOT_EDITABLE" | "DATE_UNAVAILABLE" | "MULTI_DAY_NOT_ALLOWED" | "BOOKING_TOO_LONG" | "SERVICE_TIMES_REQUIRED" | "OUTSIDE_SERVICE_HOURS" | "OUTSIDE_SERVICE_PERIOD" | "SLOT_UNAVAILABLE" | "BOOKING_DUPLICATE" | "SERVICE_UNAVAILABLE_FOR_BOOKING" | "PACK_UNAVAILABLE" | "PROVIDER_NOT_ACCEPTING" | "MIN_NOTICE" | "BOOKING_DATE_PAST" | "NOT_A_CLIENT" | "BOOKING_EXTRA_INVALID" | "BOOKING_TOTAL_NEGATIVE" | "COMMUNE_WILAYA_MISMATCH" | "ACADEMIC_REQUEST_NOT_FOUND" | "USE_RESCHEDULE" | "RESCHEDULE_NOT_FOUND" | "RESCHEDULE_NOT_PENDING" | "RESCHEDULE_PENDING_EXISTS" | "REMINDER_TOO_SOON" | "INVOICE_NOT_FOUND" | "CONVERSATION_NOT_FOUND" | "MESSAGE_NOT_FOUND" | "MESSAGE_INVALID_TRANSITION" | "CONVERSATION_CLOSED" | "CONVERSATION_NOT_CLOSED" | "CONVERSATION_ALREADY_CLOSED" | "PARTICIPANT_NOT_FOUND" | "RECIPIENT_INVALID" | "DISPUTE_NOT_FOUND" | "DISPUTE_ALREADY_OPEN" | "BOOKING_NOT_DISPUTABLE" | "DISPUTE_WINDOW_CLOSED" | "DISPUTE_INVALID_TRANSITION" | "DISPUTE_PARTY_INVALID" | "DISPUTE_EVIDENCE_LIMIT" | "EVIDENCE_FILE_INVALID" | "FORM_NOT_FOUND" | "FORM_CLOSED" | "FORM_VERSION_NOT_FOUND" | "FORM_SCHEMA_INVALID" | "FORM_TRANSLATION_MISSING" | "FORM_INVALID_TRANSITION" | "FORM_HAS_SUBMISSIONS" | "FORM_DEFAULT_REQUIRED" | "FORM_ANSWERS_INVALID" | "FORM_SUBMISSION_LIMIT" | "FORM_REQUIRES_ACCOUNT" | "CODE_INVALID" | "CODE_EXPIRED" | "CODE_RESEND_TOO_SOON" | "UPLOAD_TOKEN_INVALID" | "EDIT_LINK_INVALID" | "ACADEMIC_REQUEST_INVALID_TRANSITION" | "ACADEMIC_REQUEST_FIELDS_INVALID" | "PROPOSAL_NOT_FOUND" | "PROPOSAL_EXISTS" | "PROPOSAL_BOOKED" | "REQUESTER_NOT_CLIENT" | "REVIEW_NOT_FOUND" | "REVIEW_INVALID_TRANSITION" | "REVIEW_NO_OPEN_REPORTS" | "REVIEW_REPLY_NOT_FOUND" | "REVIEW_REPLY_INVALID_TRANSITION" | "REPORT_NOT_FOUND" | "REPORT_INVALID_TRANSITION" | "REPORT_NOT_CONVERTIBLE" | "MESSAGE_NO_OPEN_REPORTS" | "OVERVIEW_RANGE_INVALID" | "FORBIDDEN_AUDIENCE" | "EMAIL_NOT_VERIFIED" | "EMAIL_ALREADY_VERIFIED" | "PASSWORD_ALREADY_SET" | "ROLE_NOT_ALLOWED_IN_APP" | "PROVIDER_FIELDS_REQUIRED" | "PROVIDER_FIELDS_NOT_ALLOWED" | "PROVIDER_NOT_FOUND" | "FAVOURITE_NOT_FOUND" | "FAVOURITE_TARGET_INVALID" | "BUDGET_NOT_FOUND" | "BUDGET_ITEM_NOT_FOUND" | "BUDGET_ITEM_LIMIT" | "BUDGET_BOOKING_ALREADY_LINKED" | "NOTIFICATION_NOT_FOUND" | "DEVICE_TOKEN_NOT_FOUND" | "MONTH_INVALID" | "PROVIDER_NOT_VERIFIED" | "CHECK_IN_NOT_ALLOWED" | "CHECK_IN_TOO_EARLY" | "CHECK_IN_DISPUTED" | "REVIEW_EXISTS" | "REVIEW_NOT_ALLOWED" | "REVIEW_WINDOW_CLOSED" | "REVIEW_EDIT_WINDOW_CLOSED" | "REVIEW_REPLY_EXISTS" | "REPORT_TARGET_NOT_FOUND" | "NOT_A_PARTICIPANT" | "CONVERSATION_READ_ONLY" | "DISPUTE_NOT_WITHDRAWABLE" | "BOOKING_TAB_INVALID";
             /**
              * @description Translated with Accept-Language (en | ar).
              * @example This category still has 10 services.
@@ -6538,6 +6558,11 @@ export interface components {
              */
             id: string;
             /**
+             * Format: date-time
+             * @description Set on a deleted account (only listed with `includeDeleted=true`, or its read-only profile).
+             */
+            deletedAt: string | null;
+            /**
              * @example provider
              * @enum {string}
              */
@@ -6739,6 +6764,23 @@ export interface components {
             /** @example 2 */
             total: number;
         };
+        UserReportStatsDto: {
+            /**
+             * @description Open reports about this account: on the account itself and on what it owns or wrote (`GET /admin/reports?aboutUserId=`, open tab).
+             * @example 3
+             */
+            open: number;
+            /**
+             * @description Of those, open reports on the account itself (`targetType=user`), e.g. a client reporting a provider from the app.
+             * @example 1
+             */
+            openOnAccount: number;
+            /**
+             * @description All reports about the account, whatever their status (`aboutUserId`, tab all).
+             * @example 9
+             */
+            total: number;
+        };
         UserStatsDto: {
             bookings: components["schemas"]["BookingStatsDto"];
             /** @description Providers only. */
@@ -6747,6 +6789,8 @@ export interface components {
             packs: components["schemas"]["PackStatsDto"] | null;
             reviews: components["schemas"]["ReviewStatsDto"];
             disputes: components["schemas"]["DisputeStatsDto"];
+            /** @description BUG-H3: reports about this account and its content (reviews.reported only covers reviews). */
+            reports: components["schemas"]["UserReportStatsDto"];
             /**
              * @description DZD. Sum of completed booking totals (earned by a provider, spent by a client).
              * @example 3840000.00
@@ -6841,6 +6885,11 @@ export interface components {
              * @example 3f1c9a2e-8b7d-4c6a-9e5f-2a1b3c4d5e6f
              */
             id: string;
+            /**
+             * Format: date-time
+             * @description Set on a deleted account (only listed with `includeDeleted=true`, or its read-only profile).
+             */
+            deletedAt: string | null;
             /**
              * @example provider
              * @enum {string}
@@ -7088,7 +7137,7 @@ export interface components {
             /** @example 3 */
             pendingBookings: number;
             /**
-             * @description Accepted bookings from today (kept).
+             * @description Accepted bookings from today: cancelled with `bookings: cancel`, kept with `keep` (BUG-M4).
              * @example 5
              */
             upcomingBookings: number;
@@ -7121,7 +7170,7 @@ export interface components {
             /** @example Your account was blocked after several reports. */
             message?: string | null;
             /**
-             * @description What happens to pending bookings.
+             * @description What happens to the account's bookings (BUG-M4). `cancel`: every pending request **and** every accepted booking whose event is not over is cancelled (cancelledBy `admin`, reason `account_blocked`, invoices voided, the other party notified). `keep`: they all stay; the other party of each accepted one is notified that the counterpart is unavailable, and cannot propose a new date until the unblock. Unblocking never restores cancelled bookings.
              * @example cancel
              * @enum {string}
              */
@@ -7187,6 +7236,11 @@ export interface components {
             /** @example Amina Benali */
             fullName: string;
             avatarUrl: string | null;
+            /**
+             * @description BUG-M5: the account was deleted. Show "Deleted user" and no "Open profile" link (the user page answers 404).
+             * @example false
+             */
+            deleted: boolean;
         };
         BookingProviderRefDto: {
             /** Format: uuid */
@@ -7195,6 +7249,11 @@ export interface components {
             fullName: string;
             /** @example Studio Lumière */
             businessName: string | null;
+            /**
+             * @description BUG-M5: the account was deleted. Show "Deleted user" and no "Open profile" link (the user page answers 404).
+             * @example false
+             */
+            deleted: boolean;
         };
         BookingRowDto: {
             /** Format: uuid */
@@ -7269,6 +7328,11 @@ export interface components {
             /** @example Amina Benali */
             fullName: string;
             avatarUrl: string | null;
+            /**
+             * @description BUG-M5: the account was deleted. Show "Deleted user" and no "Open profile" link (the user page answers 404).
+             * @example false
+             */
+            deleted: boolean;
             /** @example amina.benali@gmail.com */
             email: string;
             /** @example +213555123456 */
@@ -7288,6 +7352,11 @@ export interface components {
             fullName: string;
             /** @example Studio Lumière */
             businessName: string | null;
+            /**
+             * @description BUG-M5: the account was deleted. Show "Deleted user" and no "Open profile" link (the user page answers 404).
+             * @example false
+             */
+            deleted: boolean;
             avatarUrl: string | null;
             /** @example karim.belkacem@gmail.com */
             email: string;
@@ -7342,6 +7411,11 @@ export interface components {
             kind: "service" | "extra" | "pack_service" | "discount" | "adjustment";
             /** @example Wedding photo & video coverage */
             label: string;
+            /**
+             * @description BUG-O2: the Arabic label; null = none.
+             * @example تغطية تصوير الأعراس
+             */
+            labelAr: string | null;
             /** @example 1 */
             quantity: number;
             /** @example 45000.00 */
@@ -7410,6 +7484,16 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             resolvedAt: string | null;
+            /**
+             * @description Booking total when proposed; null before 24 Nov 2026.
+             * @example 24000.00
+             */
+            oldTotal: string | null;
+            /**
+             * @description Total with the new hours (per-hour services, at the agreed rate); equal to `oldTotal` when unchanged; the applied total once accepted.
+             * @example 30000.00
+             */
+            newTotal: string | null;
         };
         InvoiceSummaryDto: {
             /** Format: uuid */
@@ -7551,8 +7635,11 @@ export interface components {
             /** @example 40500.00 */
             providerAmount: string;
             declineReason: string | null;
-            /** @enum {string|null} */
-            cancelledBy: "client" | "provider" | "admin" | null;
+            /**
+             * @description BUG-H4/M3: `system` = nobody (a job or an emailed link).
+             * @enum {string|null}
+             */
+            cancelledBy: "client" | "provider" | "admin" | "system" | null;
             cancelReason: string | null;
             /** Format: date-time */
             reminderSentAt: string | null;
@@ -7685,6 +7772,11 @@ export interface components {
             kind: "service" | "extra" | "pack_service" | "discount" | "adjustment";
             /** @example Drone footage */
             label: string;
+            /**
+             * @description BUG-O2: the Arabic label shown to Arabic readers and on the invoice.
+             * @example تصوير بالطائرة
+             */
+            labelAr?: string | null;
             /** @example 1 */
             quantity: number;
             /**
@@ -7740,6 +7832,11 @@ export interface components {
             kind: "service" | "extra" | "pack_service" | "discount" | "adjustment";
             /** @example Wedding photo & video coverage */
             label: string;
+            /**
+             * @description BUG-O2: the Arabic label (invoices issued since 24 Nov 2026); print it on the Arabic invoice.
+             * @example تغطية تصوير الأعراس
+             */
+            labelAr?: string | null;
             /** @example 1 */
             quantity: number;
             /** @example 45000.00 */
@@ -7771,6 +7868,18 @@ export interface components {
             titleAr: string;
             /** @example 2026-12-20 */
             eventDate: string;
+            /**
+             * @description Last day of a multi-day booking; null for one day (and on invoices issued before 24 Nov 2026).
+             * @example 2026-12-22
+             */
+            endDate: string | null;
+            /**
+             * @description Event hours (HH:mm); null when the booking has none (and on older invoices).
+             * @example 18:00
+             */
+            startTime: string | null;
+            /** @example 23:00 */
+            endTime: string | null;
             /** @enum {string} */
             eventType: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
             lines: components["schemas"]["InvoiceLineDto"][];
@@ -9045,9 +9154,16 @@ export interface components {
             endTime: string | null;
             service: components["schemas"]["AvailabilityServiceRefDto"] | null;
             booking: components["schemas"]["AvailabilityBookingRefDto"] | null;
+            /** @description The block's note. In the provider app (`/app/provider/availability`) an Eventor block (`source: admin`) always has `note: null`: the admin note is internal. */
             note: string | null;
             /**
-             * @description Manual blocks only.
+             * @description Who made a manual block (BUG-F6/M1): `provider` (from the app) or `admin` (Eventor, from the dashboard). Show an `admin` block as "Blocked by Eventor". Holds and bookings carry `provider`; only `kind: blocked` makes the difference.
+             * @example provider
+             * @enum {string}
+             */
+            source: "provider" | "admin";
+            /**
+             * @description Manual blocks only. In the provider app, false for an Eventor block (`DELETE` answers 403 `AVAILABILITY_BLOCKED_BY_EVENTOR`).
              * @example true
              */
             removable: boolean;
@@ -11132,6 +11248,8 @@ export interface components {
         AppLogoutDto: {
             /** @description The refresh token to revoke. When absent, the bearer token’s session is revoked. */
             refreshToken?: string;
+            /** @description BUG-N2: this phone’s push token (the one sent to `POST /app/me/device-tokens`). It is removed from the account signing out, so that account gets no more pushes here and the next account to sign in on the phone can register it. */
+            deviceToken?: string;
         };
         AppVerifyResetCodeDto: {
             /**
@@ -11173,6 +11291,27 @@ export interface components {
              * @example Sunflower42x
              */
             password: string;
+        };
+        AppSetPasswordCheckResultDto: {
+            /**
+             * @description First name, to greet the person on the page.
+             * @example Amel
+             */
+            firstName: string;
+            /**
+             * @description Masked email of the account the password is for.
+             * @example a***@gmail.com
+             */
+            emailHint: string;
+            /**
+             * Format: date-time
+             * @description When the link stops working.
+             */
+            expiresAt: string;
+        };
+        AppSetPasswordCheckDto: {
+            /** @description The `token` query parameter of the emailed link. */
+            token: string;
         };
         UpdateAppMeDto: {
             /** @example Amina Benali */
@@ -11392,7 +11531,7 @@ export interface components {
              * @example dispute.message
              * @enum {string}
              */
-            type: "booking.requested" | "booking.accepted" | "booking.declined" | "booking.cancelled" | "booking.completed" | "booking.rescheduled" | "booking.reschedule_proposed" | "booking.reschedule_rejected" | "booking.price_changed" | "booking.reminder" | "booking.review_requested" | "dispute.opened" | "dispute.message" | "dispute.evidence_requested" | "dispute.resolved" | "dispute.closed" | "review.new" | "review.shown" | "review.hidden" | "review.redacted" | "review_reply.hidden" | "review_reply.shown" | "report.resolved" | "report.dismissed" | "academic_request.cancelled" | "verification.approved" | "verification.rejected";
+            type: "booking.requested" | "booking.accepted" | "booking.declined" | "booking.cancelled" | "booking.completed" | "booking.rescheduled" | "booking.reschedule_proposed" | "booking.reschedule_rejected" | "booking.price_changed" | "booking.counterparty_blocked" | "booking.reminder" | "booking.review_requested" | "dispute.opened" | "dispute.message" | "dispute.evidence_requested" | "dispute.resolved" | "dispute.closed" | "review.new" | "review.shown" | "review.hidden" | "review.redacted" | "review_reply.hidden" | "review_reply.shown" | "report.resolved" | "report.dismissed" | "academic_request.cancelled" | "verification.approved" | "verification.rejected";
             /** @example Dispute DSP-000012 */
             title: string;
             /** @example New message from Eventor support. */
@@ -12601,8 +12740,18 @@ export interface components {
              * @enum {string}
              */
             kind: "service" | "extra" | "pack_service" | "discount" | "adjustment";
-            /** @example Wedding photo & video coverage */
+            /**
+             * @description BUG-O2: in the request language (Arabic when there is an Arabic name).
+             * @example Wedding photo & video coverage
+             */
             label: string;
+            /** @example Wedding photo & video coverage */
+            labelEn: string;
+            /**
+             * @description Null on lines without an Arabic name (then show `labelEn`).
+             * @example تغطية تصوير الأعراس
+             */
+            labelAr: string | null;
             /** @example 1 */
             quantity: number;
             /** @example 45000.00 */
@@ -12728,16 +12877,18 @@ export interface components {
         };
         AppBookingTimelineEntryDto: {
             /**
-             * @description `created`, the booking status the entry moved to, or one of the milestones `rescheduled` / `checked_in` / `dispute_opened`.
+             * @description `created`, the booking status the entry moved to, or one of the milestones `rescheduled` / `checked_in` / `dispute_opened` / `dispute_resolved` (`reason` = the booking outcome) / `reopened` (BUG-H5: a completed booking set back to accepted by a dispute outcome or an admin — not an acceptance; `toStatus` is null).
              * @example accepted
              * @enum {string}
              */
-            type: "created" | "pending" | "accepted" | "declined" | "cancelled" | "completed" | "rescheduled" | "checked_in" | "dispute_opened";
+            type: "created" | "pending" | "accepted" | "declined" | "cancelled" | "completed" | "rescheduled" | "checked_in" | "dispute_opened" | "reopened" | "dispute_resolved";
             /** @enum {string|null} */
             toStatus: "pending" | "accepted" | "declined" | "cancelled" | "completed" | null;
             /** @example Yasmine K. */
             actorLabel: string | null;
             reason: string | null;
+            /** @description BUG-H4/M3: `reason` to display, in the request language; never a raw code. */
+            reasonLabel: string | null;
             /** Format: date-time */
             at: string;
         };
@@ -12766,6 +12917,16 @@ export interface components {
              * @example true
              */
             awaitingMe: boolean;
+            /**
+             * @description Booking total when the date was proposed. Null on proposals made before 24 Nov 2026.
+             * @example 24000.00
+             */
+            oldTotal: string | null;
+            /**
+             * @description Total with the new hours: a `per_hour` service is billed the new number of hours at the rate already agreed on the booking (BUG-E3). Equal to `oldTotal` when the price does not change; show "New total" when they differ. Once accepted, the total that was applied. Null on older proposals.
+             * @example 30000.00
+             */
+            newTotal: string | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -12862,6 +13023,11 @@ export interface components {
              * @description The direct chat, for the "Message" button.
              */
             conversationId: string | null;
+            /**
+             * @description The other party's account is blocked by Eventor and the booking was kept (BUG-M4). Show "<counterparty> is temporarily unavailable"; `reschedule` is then missing from `allowedActions` on an accepted booking. Back to false when they are unblocked (`booking:updated`).
+             * @example false
+             */
+            counterpartyBlocked: boolean;
             /** @description The buttons to draw; the write endpoints enforce the same rules. */
             allowedActions: ("cancel" | "accept" | "decline" | "complete" | "reschedule" | "respond_reschedule" | "check_in" | "review" | "dispute" | "message" | "invoice")[];
             /** Format: date-time */
@@ -12882,10 +13048,24 @@ export interface components {
             feePercent: string;
             /** @description The service’s cancellation policy text, shown but never enforced (status-rules §3). */
             cancellationPolicy: string | null;
+            /** @description The stored code (e.g. `account_blocked`) or the words the client / provider typed. */
             cancelReason: string | null;
-            /** @enum {string|null} */
-            cancelledBy: "client" | "provider" | "admin" | null;
+            /**
+             * @description BUG-H4/M3: `cancelReason` to display, in the request language; never a raw code.
+             * @example The account was suspended by Eventor
+             */
+            cancelReasonLabel: string | null;
+            /**
+             * @description BUG-H4/M3: who cancelled. `client` / `provider` = that party; `admin` = Eventor (dashboard, account block, dispute outcome); `system` = nobody (a job). Show "Eventor cancelled this booking" for `admin` and `system`, never the provider.
+             * @enum {string|null}
+             */
+            cancelledBy: "client" | "provider" | "admin" | "system" | null;
             declineReason: string | null;
+            /**
+             * @description BUG-H4/M3: `declineReason` to display, in the request language.
+             * @example No reply in time
+             */
+            declineReasonLabel: string | null;
             /** @description The provider card screen 12 draws; null on a pack whose provider was deleted. */
             provider: components["schemas"]["AppProviderSummaryDto"] | null;
             timeline: components["schemas"]["AppBookingTimelineEntryDto"][];
@@ -13028,6 +13208,11 @@ export interface components {
              * @description The direct chat, for the "Message" button.
              */
             conversationId: string | null;
+            /**
+             * @description The other party's account is blocked by Eventor and the booking was kept (BUG-M4). Show "<counterparty> is temporarily unavailable"; `reschedule` is then missing from `allowedActions` on an accepted booking. Back to false when they are unblocked (`booking:updated`).
+             * @example false
+             */
+            counterpartyBlocked: boolean;
             /** @description The buttons to draw; the write endpoints enforce the same rules. */
             allowedActions: ("cancel" | "accept" | "decline" | "complete" | "reschedule" | "respond_reschedule" | "check_in" | "review" | "dispute" | "message" | "invoice")[];
             /** Format: date-time */
@@ -13489,6 +13674,11 @@ export interface components {
              * @example false
              */
             blocked: boolean;
+            /**
+             * @description BUG-M5: the account was deleted. Show the chat read-only with "This account was deleted" (`canWrite` is false; sending answers 410 `RECIPIENT_DELETED`). The name stays until the account is anonymised (30 days after the deletion).
+             * @example false
+             */
+            deleted: boolean;
         };
         AppLastMessageDto: {
             /**
@@ -13603,6 +13793,33 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        AppSystemMessageDto: {
+            /**
+             * @description What happened. Render the text from it and `params` in the app language; `body` already holds it in the request language.
+             * @example booking_accepted
+             * @enum {string}
+             */
+            event: "booking_requested" | "booking_accepted" | "booking_declined" | "booking_cancelled" | "booking_completed" | "booking_expired" | "reschedule_proposed" | "reschedule_accepted" | "reschedule_declined" | "booking_rescheduled";
+            /**
+             * Format: uuid
+             * @description Tap → open this booking (B4 / P2).
+             */
+            bookingId: string;
+            /** @example EVT-000123 */
+            bookingRef: string;
+            /**
+             * @description `date` / `endDate` (`YYYY-MM-DD`), `startTime` / `endTime` (`HH:mm`), `titleEn` / `titleAr`, `actor` (`client` | `provider` | `admin` | `system`), `reason` (decline / cancel code). Reschedules add `oldDate`, `newDate`, `newStartTime`, `newEndTime` and, when the price changes, `oldTotal` / `newTotal`.
+             * @example {
+             *       "date": "2026-12-03",
+             *       "startTime": "18:00",
+             *       "endTime": "22:00",
+             *       "titleEn": "Wedding DJ",
+             *       "titleAr": "دي جي للأعراس",
+             *       "actor": "provider"
+             *     }
+             */
+            params: Record<string, never>;
+        };
         AppMessageDto: {
             /** Format: uuid */
             id: string;
@@ -13635,10 +13852,17 @@ export interface components {
              * @example false
              */
             removed: boolean;
+            /**
+             * @description BUG-G4: only true on a `message:updated` socket event for a message an admin deleted (`body` is empty): drop the bubble. Lists never contain deleted messages.
+             * @example false
+             */
+            deleted: boolean;
             /** @description Signed URL of the image, for an `attachment` message. */
             imageUrl: string | null;
             /** @description Full-size signed URL of the image. */
             imageLargeUrl: string | null;
+            /** @description BUG-G2: set on a booking system message (`kind: system`) since 24 Nov 2026; null on other messages and on older system messages. */
+            system: components["schemas"]["AppSystemMessageDto"] | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -14079,7 +14303,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked. */
+            /** @description `FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -14258,7 +14482,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password. */
+            /** @description `PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password.<br>`PASSWORD_UNCHANGED`: The new password must be different from your current password. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -17152,6 +17376,8 @@ export interface operations {
                 q?: string;
                 role?: "client" | "provider";
                 status?: "active" | "blocked";
+                /** @description BUG-M5 follow-up: also list deleted accounts (rows carry `deletedAt`; show a "Deleted" badge). Off by default. Their profile opens read-only with `GET /admin/users/{id}?includeDeleted=true`; every action on them answers 404 USER_NOT_FOUND. */
+                includeDeleted?: boolean;
                 verificationStatus?: "not_required" | "pending" | "verified" | "rejected";
                 /** @description Wilaya codes; repeat for several. */
                 wilaya?: number[];
@@ -17382,7 +17608,10 @@ export interface operations {
     };
     AdminUsersController_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description BUG-M5 follow-up: also open a deleted account, read-only (`deletedAt` is set). Without it a deleted account is 404 as before; its actions are always 404. */
+                includeDeleted?: boolean;
+            };
             header?: {
                 "Accept-Language"?: "en" | "ar";
             };
@@ -18849,7 +19078,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}. */
+            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}.<br>`BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -25820,6 +26049,10 @@ export interface operations {
                 tab?: "open" | "resolved" | "dismissed" | "all";
                 /** @description Repeat for several. */
                 targetType?: ("review" | "review_reply" | "message" | "service" | "pack" | "user")[];
+                /** @description Only the reports on this target (with `targetType`, e.g. `targetType=user&targetId=` for one account). */
+                targetId?: string;
+                /** @description BUG-H3: the reports about one account — on the account itself and on what it owns or wrote (services, packs, messages sent, reviews and replies written). Same definition as `stats.reports` on `GET /admin/users/{id}`: the user page lists these. */
+                aboutUserId?: string;
                 /** @description Repeat for several. */
                 reason?: ("inappropriate" | "spam" | "contact_outside" | "harassment" | "fake" | "other")[];
                 /** @description Created on or after (UTC day). */
@@ -26548,7 +26781,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `ACCOUNT_BLOCKED`: This account is blocked.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
+            /** @description `ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -26667,7 +26900,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `EMAIL_NOT_VERIFIED`: Verify your email address before signing in.<br>`ACCOUNT_BLOCKED`: This account is blocked.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
+            /** @description `EMAIL_NOT_VERIFIED`: Verify your email address before signing in.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -27023,7 +27256,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `ACCOUNT_BLOCKED`: This account is blocked.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
+            /** @description `ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -27032,7 +27265,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `CODE_INVALID`: The verification code is incorrect.<br>`CODE_EXPIRED`: The verification code has expired. Ask for a new one.<br>`PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password. */
+            /** @description `CODE_INVALID`: The verification code is incorrect.<br>`CODE_EXPIRED`: The verification code has expired. Ask for a new one.<br>`PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password.<br>`PASSWORD_UNCHANGED`: The new password must be different from your current password. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -27087,7 +27320,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `ACCOUNT_BLOCKED`: This account is blocked.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
+            /** @description `ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -27105,8 +27338,72 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password. */
+            /** @description `PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password.<br>`PASSWORD_UNCHANGED`: The new password must be different from your current password. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RATE_LIMITED`: Too many requests. Please try again later. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AppAuthController_checkSetPassword: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: "en" | "ar";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppSetPasswordCheckDto"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AppSetPasswordCheckResultDto"];
+                    };
+                };
+            };
+            /** @description `VALIDATION_FAILED`: Some fields are invalid.<br>`RESET_TOKEN_INVALID`: This password reset link is invalid or has already been used. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.<br>`ROLE_NOT_ALLOWED_IN_APP`: Only client and provider accounts can use the app. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RESET_TOKEN_EXPIRED`: This password reset link has expired. */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -27161,7 +27458,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27220,7 +27517,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27310,7 +27607,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27387,7 +27684,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27399,7 +27696,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `CURRENT_PASSWORD_INVALID`: The current password is incorrect.<br>`PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password. */
+            /** @description `CURRENT_PASSWORD_INVALID`: The current password is incorrect.<br>`PASSWORD_WEAK`: The password must have at least 10 characters, including a letter and a digit, and must not be a common password.<br>`PASSWORD_UNCHANGED`: The new password must be different from your current password. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -27462,7 +27759,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27539,7 +27836,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27589,7 +27886,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27637,7 +27934,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27696,7 +27993,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27785,7 +28082,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27884,7 +28181,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27934,7 +28231,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -27983,7 +28280,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28042,7 +28339,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28105,7 +28402,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28171,7 +28468,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28221,7 +28518,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28284,7 +28581,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28332,7 +28629,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28405,7 +28702,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28468,7 +28765,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28534,7 +28831,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28610,7 +28907,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28673,7 +28970,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28750,7 +29047,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -28808,7 +29105,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -29264,7 +29561,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -29312,7 +29609,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -29529,7 +29826,7 @@ export interface operations {
                 priceMax?: number;
                 /** @description Minimum average rating. */
                 rating?: number;
-                /** @description Keep only services free on that day. */
+                /** @description Keep only services free on that day: the day their calendar (`GET /app/services/{id}/availability`) shows as `available`. A day before `firstBookableDate` returns an empty list. */
                 eventDate?: string;
                 /** @description Matches the categories used by packs of that event type. */
                 eventType?: "wedding" | "engagement" | "henna" | "birthday" | "circumcision" | "graduation" | "corporate" | "conference" | "academic" | "other";
@@ -30127,7 +30424,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -30215,7 +30512,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -30439,7 +30736,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}". */
+            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}".<br>`BOOKING_EVENT_OVER`: This event is over: the booking can no longer be cancelled or moved. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -30514,7 +30811,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}.<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`SLOT_UNAVAILABLE`: These hours are already booked on {date}. Choose other times.<br>`RESCHEDULE_PENDING_EXISTS`: A new date is already waiting for confirmation. Cancel it first. */
+            /** @description `BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}.<br>`BOOKING_EXPIRED`: This request expired: it was not answered in time.<br>`BOOKING_EVENT_OVER`: This event is over: the booking can no longer be cancelled or moved.<br>`COUNTERPARTY_UNAVAILABLE`: The other party is temporarily unavailable on Eventor: the date cannot be changed now. Contact Eventor support.<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`SLOT_UNAVAILABLE`: These hours are already booked on {date}. Choose other times.<br>`RESCHEDULE_PENDING_EXISTS`: A new date is already waiting for confirmation. Cancel it first. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -30721,7 +31018,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}. */
+            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}.<br>`BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -30952,7 +31249,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -31029,7 +31326,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -31108,7 +31405,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -31244,7 +31541,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}".<br>`DATE_UNAVAILABLE`: The provider is not available on {date}. */
+            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}".<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`BOOKING_EXPIRED`: This request expired: it was not answered in time. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -31328,7 +31625,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}". */
+            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}".<br>`BOOKING_EXPIRED`: This request expired: it was not answered in time. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -31412,7 +31709,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}". */
+            /** @description `BOOKING_INVALID_TRANSITION`: A booking cannot move from "{from}" to "{to}".<br>`BOOKING_EVENT_OVER`: This event is over: the booking can no longer be cancelled or moved. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -31567,7 +31864,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}.<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`SLOT_UNAVAILABLE`: These hours are already booked on {date}. Choose other times.<br>`RESCHEDULE_PENDING_EXISTS`: A new date is already waiting for confirmation. Cancel it first. */
+            /** @description `BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}.<br>`BOOKING_EXPIRED`: This request expired: it was not answered in time.<br>`BOOKING_EVENT_OVER`: This event is over: the booking can no longer be cancelled or moved.<br>`COUNTERPARTY_UNAVAILABLE`: The other party is temporarily unavailable on Eventor: the date cannot be changed now. Contact Eventor support.<br>`DATE_UNAVAILABLE`: The provider is not available on {date}.<br>`SLOT_UNAVAILABLE`: These hours are already booked on {date}. Choose other times.<br>`RESCHEDULE_PENDING_EXISTS`: A new date is already waiting for confirmation. Cancel it first. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -31783,7 +32080,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}. */
+            /** @description `RESCHEDULE_NOT_PENDING`: This reschedule proposal is already {status}.<br>`BOOKING_NOT_EDITABLE`: This action is not possible while the booking is {status}. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -32041,7 +32338,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -32109,7 +32406,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -32762,7 +33059,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -32830,7 +33127,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -33495,7 +33792,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -33563,7 +33860,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -33615,7 +33912,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description `NOT_OWNER`: You do not own this item. */
+            /** @description `NOT_OWNER`: You do not own this item.<br>`AVAILABILITY_BLOCKED_BY_EVENTOR`: Eventor blocked this time. Contact Eventor support to change it. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -33699,7 +33996,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`FORBIDDEN_ROLE`: Your account role cannot access this.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -33774,7 +34071,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */
@@ -34070,6 +34367,15 @@ export interface operations {
             };
             /** @description `CONVERSATION_CLOSED`: This conversation is closed. Reopen it to write. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description `RECIPIENT_DELETED`: This account was deleted: messages can no longer be sent here. */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -34907,7 +35213,7 @@ export interface operations {
                 };
             };
             /**
-             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: This account is blocked.
+             * @description `FORBIDDEN_AUDIENCE`: This token belongs to another application.<br>`ACCOUNT_BLOCKED`: Eventor has suspended this account, so it cannot be used for now.
              *
              *     `FORBIDDEN_ROLE`: Your account role cannot access this.
              */

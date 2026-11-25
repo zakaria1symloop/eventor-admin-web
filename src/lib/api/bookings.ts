@@ -19,6 +19,8 @@ export type BookingLineKind = "service" | "extra" | "pack_service" | "discount" 
 export type RescheduleStatus = "pending" | "accepted" | "rejected" | "cancelled";
 export type StatusAction = "accepted" | "declined" | "cancelled" | "completed" | "reopen";
 export type PartyRole = "client" | "provider" | "admin";
+/** Who cancelled a booking: a party, or `system` (no person: a job, the request expiry). */
+export type CancelledBy = PartyRole | "system";
 export type MessageKind = "text" | "attachment" | "system";
 export type MessageStatus = "visible" | "hidden" | "deleted";
 
@@ -266,7 +268,7 @@ export interface BookingDetail extends Omit<BookingRow, "client" | "provider"> {
   feeAmount: string;
   providerAmount: string;
   declineReason: string | null;
-  cancelledBy: PartyRole | null;
+  cancelledBy: CancelledBy | null;
   cancelReason: string | null;
   reminderSentAt: string | null;
   completedAt: string | null;
