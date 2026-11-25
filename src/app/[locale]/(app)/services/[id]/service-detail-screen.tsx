@@ -18,7 +18,9 @@ import {
   Smartphone,
   Star,
   Tag,
+  Send,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useLocale, useTranslations } from "next-intl";
@@ -45,7 +47,14 @@ import { getService, localTitle, serviceKeys, type ServiceDetail } from "@/lib/a
 import { formatCompactMoney, formatDate, formatDateTime, formatMoney, formatNumber, initials } from "@/lib/utils/format";
 import { localName } from "../../users/use-user-options";
 import { PhotoGallery } from "../photo-gallery";
-import { DeleteServiceDialog, HideServiceDialog, showServices, toggleFeatured } from "../service-dialogs";
+import {
+  DeleteServiceDialog,
+  HideServiceDialog,
+  publishService,
+  showServices,
+  toggleFeatured,
+  UnpublishServiceDialog,
+} from "../service-dialogs";
 import { ServiceStatusCell } from "../services-screen";
 import { AvailabilityCalendar } from "./availability-calendar";
 
@@ -60,7 +69,7 @@ export function ServiceDetailScreen({ id }: { id: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const query = useService(id);
-  const [overlay, setOverlay] = useState<"hide" | "delete" | null>(null);
+  const [overlay, setOverlay] = useState<"hide" | "unpublish" | "delete" | null>(null);
   const invalidate = () => queryClient.invalidateQueries({ queryKey: serviceKeys.all });
 
   if (query.isPending) {
@@ -215,7 +224,7 @@ export function ServiceDetailScreen({ id }: { id: string }) {
           {
             label: (
               <>
-                {td("by")}{" "}
+                {td("offeredBy")}{" "}
                 <Link href={`/users/${s.provider.id}`} className="font-medium text-brand hover:underline">
                   {[s.provider.fullName, s.provider.businessName].filter(Boolean).join(" · ")}
                 </Link>
@@ -249,6 +258,21 @@ export function ServiceDetailScreen({ id }: { id: string }) {
                 {td("hide")}
               </Button>
             )}
+            {/* SRV-05: unpublish (back to draft) next to Hide; a draft can be published from here. */}
+            {s.status === "published" && (
+              <Button variant="secondary" icon={<Undo2 />} onClick={() => setOverlay("unpublish")}>
+                {t("menu.unpublish")}
+              </Button>
+            )}
+            {s.status === "draft" && (
+              <Button
+                variant="secondary"
+                icon={<Send />}
+                onClick={() => void publishService(target, t, () => void invalidate())}
+              >
+                {t("menu.publish")}
+              </Button>
+            )}
             <Button icon={<Pencil />} onClick={() => router.push(`/services/${s.id}/edit`)}>
               {td("edit")}
             </Button>
@@ -273,6 +297,12 @@ export function ServiceDetailScreen({ id }: { id: string }) {
 
       <DetailTabs service={s} onOverlay={setOverlay} />
 
+      <UnpublishServiceDialog
+        service={target}
+        open={overlay === "unpublish"}
+        onOpenChange={(o) => !o && setOverlay(null)}
+        onDone={() => void invalidate()}
+      />
       <HideServiceDialog
         services={[target]}
         open={overlay === "hide"}

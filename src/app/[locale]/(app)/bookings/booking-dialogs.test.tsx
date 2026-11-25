@@ -10,12 +10,16 @@ const changeBookingStatus = vi.fn();
 const changeBookingPrice = vi.fn();
 const rescheduleBooking = vi.fn();
 const getAvailability = vi.fn();
+const cancelReschedule = vi.fn();
+const getBooking = vi.fn();
 
 vi.mock("@/lib/api/bookings", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/bookings")>()),
   changeBookingStatus: (...a: unknown[]) => changeBookingStatus(...a),
   changeBookingPrice: (...a: unknown[]) => changeBookingPrice(...a),
   rescheduleBooking: (...a: unknown[]) => rescheduleBooking(...a),
+  cancelReschedule: (...a: unknown[]) => cancelReschedule(...a),
+  getBooking: (...a: unknown[]) => getBooking(...a),
 }));
 vi.mock("@/lib/api/services", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/services")>()),
@@ -281,6 +285,48 @@ describe("BKG-06 PriceDrawer", () => {
 });
 
 describe("BKG-05 RescheduleDialog", () => {
+  const proposal = {
+    id: "r1",
+    oldDate: "2030-04-09",
+    oldStart: "14:00",
+    oldEnd: "18:00",
+    newDate: "2030-04-20",
+    newStart: "14:00",
+    newEnd: "20:00",
+    proposedBy: { id: "c1", fullName: "Sofiane Brahimi" },
+    reason: null,
+    forced: false,
+    status: "pending" as const,
+    createdAt: "2030-04-01T10:00:00.000Z",
+    resolvedAt: null,
+    oldTotal: "24000.00",
+    newTotal: "30000.00",
+  };
+
+  it("BUG-E5/E7: shows the total change, and a proposal closed meanwhile reloads the booking", async () => {
+    const user = userEvent.setup();
+    getAvailability.mockResolvedValue({ providerId: "p1", month: "2030-04", maxEventsPerDay: 1, days: [] });
+    cancelReschedule.mockImplementationOnce(() =>
+      Promise.reject(new ApiError({ status: 409, code: "RESCHEDULE_NOT_PENDING", message: "closed" })),
+    );
+    const fresh = booking({ status: "cancelled", pendingReschedule: null });
+    getBooking.mockResolvedValue(fresh);
+    const onDone = vi.fn();
+    renderWithProviders(
+      <RescheduleDialog
+        booking={booking({ status: "accepted", pendingReschedule: proposal })}
+        open
+        onOpenChange={() => undefined}
+        onDone={onDone}
+      />,
+    );
+    const dialog = screen.getByRole("dialog", { name: "Reschedule #EVT-002030" });
+    // formatMoney groups thousands with a space-like separator: match the digits, not the separator
+    expect(within(dialog).getByText(/Total 24.?000.* → 30.?000/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel proposal" }));
+    await waitFor(() => expect(getBooking).toHaveBeenCalledWith("b1"));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith(fresh));
+  });
   it("asks for “Book anyway” on a busy day and sends force", async () => {
     const user = userEvent.setup();
     getAvailability.mockResolvedValue({

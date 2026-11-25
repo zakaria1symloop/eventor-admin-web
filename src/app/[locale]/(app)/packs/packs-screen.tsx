@@ -16,6 +16,7 @@ import {
   type DataColumn,
   type FilterConfig,
   type ListParams,
+  type ListResult,
   type QuickFilterItem,
 } from "@/components/data-list";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
@@ -188,6 +189,8 @@ export function PacksScreen() {
   const [unpublishing, setUnpublishing] = useState<{ rows: PackTarget[]; clear?: () => void } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [params, setParams] = useState<ListParams | null>(null);
+  // L-37: the export summary uses the list's own result (tab + search + filters), not the overall stats.
+  const [listResult, setListResult] = useState<ListResult | null>(null);
   const invalidate = () => queryClient.invalidateQueries({ queryKey: packKeys.all });
 
   const stats = useQuery({ queryKey: [...packKeys.all, "stats"], queryFn: () => listPacks({ limit: 1 }) });
@@ -412,6 +415,7 @@ export function PacksScreen() {
         columnsStorageKey="packs"
         itemLabel={t("itemLabel")}
         onParamsChange={setParams}
+        onResultChange={setListResult}
         onRowClick={(p) => router.push(`/packs/${p.id}`)}
         rowMenuHeader={(p) => ({
           title: localPackName(p, locale),
@@ -474,12 +478,14 @@ export function PacksScreen() {
       />
       <ExportDialog
         open={exportOpen}
+        activeFilters={listResult?.filters}
+        search={listResult?.q}
         onOpenChange={setExportOpen}
         resource="packs"
         title={t("exportTitle")}
         filters={params ? exportFilters(params) : {}}
         summary={t("exportSummary", {
-          count: formatNumber(stats.data?.meta.total ?? 0, locale),
+          count: formatNumber(listResult?.total ?? stats.data?.meta.total ?? 0, locale),
           tab: t(`tabs.${params?.tab || "all"}`),
         })}
         columns={[

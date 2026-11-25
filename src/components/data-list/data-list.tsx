@@ -13,9 +13,24 @@ import { EmptyState, ErrorState, TableSkeleton } from "@/components/feedback/sta
 import type { ListResponse } from "@/lib/api/client";
 import { BulkBar } from "./bulk-bar";
 import { DataTable, type DataColumn, type DataTableProps } from "./data-table";
-import { DebouncedSearch, FilterBar, FilterChips, FilterSelect, SortSelect } from "./filter-bar";
+import {
+  DebouncedSearch,
+  describeFilters,
+  FilterBar,
+  FilterChips,
+  FilterSelect,
+  SortSelect,
+  type ActiveFilter,
+} from "./filter-bar";
 import { Pagination } from "./pagination";
 import { parseSort, useListState, type FilterConfig, type ListParams } from "./use-list-state";
+
+/** `onResultChange`: rows matching the tab, search and filters (null while loading) and the active filters. */
+export interface ListResult {
+  total: number | null;
+  q: string;
+  filters: ActiveFilter[];
+}
 import {
   AdvancedFiltersDrawer,
   advancedToFilterConfigs,
@@ -76,6 +91,11 @@ export interface DataListProps<T extends object> {
   footer?: (response: ListResponse<T>) => ReactNode;
   /** Called whenever the URL list params change (export dialog, reorder). */
   onParamsChange?: (params: ListParams) => void;
+  /**
+   * L-37: the current result (total for the tab, search and filters) and the active filters as the chips
+   * describe them — for summaries such as the export dialog.
+   */
+  onResultChange?: (result: ListResult) => void;
   /** Hide pagination (short, fully loaded lists). */
   hidePagination?: boolean;
 }
@@ -109,6 +129,7 @@ export function DataList<T extends object>({
   onRowClick,
   footer,
   onParamsChange,
+  onResultChange,
   hidePagination,
 }: DataListProps<T>) {
   const ts = useTranslations("states");
@@ -156,6 +177,17 @@ export function DataList<T extends object>({
     queryFn: () => queryFn(params),
     placeholderData: keepPreviousData,
   });
+
+  const resultTotal = query.isPlaceholderData ? null : (query.data?.meta.total ?? null);
+  const resultJson = JSON.stringify({
+    total: resultTotal,
+    q: params.q,
+    filters: describeFilters(allFilters, params.filters),
+  });
+  useEffect(() => {
+    onResultChange?.(JSON.parse(resultJson) as ListResult);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultJson]);
 
   // Selection is scoped to the current query; it resets when params change.
   const paramsKey = JSON.stringify(params);

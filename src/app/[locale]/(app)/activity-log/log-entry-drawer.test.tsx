@@ -29,9 +29,10 @@ const entry: ActivityLogDetail = {
   requestId: null,
   object: { type: "booking", id: "b1", label: "EVT-002030" },
 };
+let current: ActivityLogDetail = entry;
 vi.mock("@/lib/api/activity-log", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/activity-log")>()),
-  getActivityLogEntry: () => Promise.resolve(entry),
+  getActivityLogEntry: () => Promise.resolve(current),
 }));
 
 describe("BUG-H4/M3 who cancelled, in the activity log", () => {
@@ -45,5 +46,35 @@ describe("BUG-H4/M3 who cancelled, in the activity log", () => {
   it("in Arabic", async () => {
     renderWithProviders(<LogEntryDrawer id="e1" onClose={() => undefined} />, { locale: "ar" });
     expect(await screen.findByText("إيفنتور (تلقائيًا)")).toBeInTheDocument();
+  });
+});
+
+describe("L-38 the note is titled by who wrote it", () => {
+  const withNote = (actorRole: "client" | "provider" | "admin" | null): ActivityLogDetail => ({
+    ...entry,
+    id: `e-${actorRole ?? "system"}`,
+    actorRole,
+    actor: actorRole
+      ? { id: "u1", fullName: "Sofiane Brahimi", role: actorRole, email: "s@x.dz", isDeleted: false }
+      : null,
+    note: "We found another venue.",
+    hasNote: true,
+  });
+
+  it.each([
+    ["client", "Note from the client"],
+    ["admin", "Note from the admin"],
+    [null, "Note"],
+  ] as const)("actor %s → “%s”", async (role, title) => {
+    current = withNote(role);
+    renderWithProviders(<LogEntryDrawer id={current.id} onClose={() => undefined} />);
+    expect(await screen.findByRole("heading", { name: title })).toBeInTheDocument();
+    expect(screen.queryByText("Note written by the admin")).not.toBeInTheDocument();
+  });
+
+  it("in Arabic, a provider's note", async () => {
+    current = withNote("provider");
+    renderWithProviders(<LogEntryDrawer id={current.id} onClose={() => undefined} />, { locale: "ar" });
+    expect(await screen.findByRole("heading", { name: "ملاحظة مقدم الخدمة" })).toBeInTheDocument();
   });
 });

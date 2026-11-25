@@ -137,3 +137,35 @@ describe("DataList URL-only filters", () => {
     expect(screen.getAllByText(/Karim Belkacem/).length).toBeGreaterThan(0);
   });
 });
+
+describe("L-37 DataList result for summaries", () => {
+  it("reports the filtered total and the active filters as the chips describe them", async () => {
+    const onResultChange = vi.fn();
+    renderWithProviders(
+      <DataList<MockUser>
+        resource={["users-result"]}
+        queryFn={(params) => fetchMockUsers(params, { delay: 0 })}
+        columns={columns}
+        getRowId={(u) => u.id}
+        filters={[
+          { key: "wilaya", label: "Wilaya", options: [{ value: "Alger", label: "Alger" }], multiple: true },
+        ]}
+        onResultChange={onResultChange}
+      />,
+      { searchParams: "?wilaya=Alger&q=a" },
+    );
+    const expected = (
+      await fetchMockUsers(
+        { q: "a", page: 1, limit: 10, sort: "", tab: "", filters: { wilaya: ["Alger"] } },
+        { delay: 0 },
+      )
+    ).meta.total;
+    await waitFor(() =>
+      expect(onResultChange).toHaveBeenLastCalledWith({
+        total: expected,
+        q: "a",
+        filters: [{ key: "wilaya", label: "Wilaya", text: "Alger" }],
+      }),
+    );
+  });
+});

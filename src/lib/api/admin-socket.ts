@@ -44,6 +44,15 @@ export interface AdminSocketHandlers {
   onAcademicRequest?: (event: { id: string; reference?: string; status?: string }) => void;
   /** Module 13: a notification for the signed-in admin (SHL-02). */
   onNotificationNew?: (notification: AdminNotification) => void;
+  /** #24: an invitation was sent, accepted or revoked, or an admin removed — the admin accounts list changed. */
+  onAdminsUpdated?: (event: AdminsUpdatedEvent) => void;
+}
+
+/** `admins:updated` payload (sent to every connected admin). */
+export interface AdminsUpdatedEvent {
+  reason: "invitation_sent" | "invitation_accepted" | "invitation_revoked" | "admin_removed";
+  userId: string | null;
+  invitationId: string | null;
 }
 
 /** Subscribes to live events while mounted; joins the conversation room when `conversationId` is set. */
@@ -72,8 +81,11 @@ export function useAdminSocket(handlers: AdminSocketHandlers, conversationId?: s
     s.on("academic_request:updated", onAcademic);
     const onNotification = (n: AdminNotification) => ref.current.onNotificationNew?.(n);
     s.on("notification:new", onNotification);
+    const onAdmins = (e: AdminsUpdatedEvent) => ref.current.onAdminsUpdated?.(e);
+    s.on("admins:updated", onAdmins);
     return () => {
       s.off("notification:new", onNotification);
+      s.off("admins:updated", onAdmins);
       s.off("message:new", onNew);
       s.off("message:updated", onUpdated);
       s.off("conversation:updated", onConv);

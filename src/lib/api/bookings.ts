@@ -205,6 +205,10 @@ export interface Reschedule {
   status: RescheduleStatus;
   createdAt: string;
   resolvedAt: string | null;
+  /** BUG-E5: the booking total when proposed (null before 24 Nov 2026). */
+  oldTotal: string | null;
+  /** Total with the new hours (per-hour services); equals `oldTotal` when unchanged. */
+  newTotal: string | null;
 }
 export interface InvoiceSummary {
   id: string;
@@ -507,14 +511,34 @@ export async function downloadInvoicePdf(id: string, fileName: string) {
     res = await doFetch();
   }
   if (!res.ok) throw await toApiError(res);
-  const url = URL.createObjectURL(await res.blob());
+  // L-27: the API names the file (`Content-Disposition: …; filename="INV-2026-0419.pdf"`); keep the PDF type on
+  // the blob and release it late, so the browser always saves a complete, correctly named .pdf.
+  const blob = new Blob([await res.blob()], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = fileName;
+  a.download = contentDispositionFileName(res.headers.get("content-disposition")) ?? fileName;
+  a.rel = "noopener";
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** `attachment; filename*=UTF-8''INV%2F1.pdf` or `inline; filename="INV-1.pdf"` → the file name, else null. */
+export function contentDispositionFileName(header: string | null): string | null {
+  if (!header) return null;
+  const star = /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim().replace(/^"|"$/g, "")) || null;
+    } catch {
+      /* fall back to filename= */
+    }
+  }
+  const plain = /filename\s*=\s*("([^"]*)"|[^;]+)/i.exec(header);
+  const name = (plain?.[2] ?? plain?.[1] ?? "").trim();
+  return name || null;
 }
 
 /* ------------------------------------------------------------------ money helpers (mirror the API policy) */

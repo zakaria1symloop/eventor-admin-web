@@ -10,6 +10,18 @@ export function InvoiceDocument({ invoice: inv }: { invoice: Invoice }) {
   const locale = useLocale();
   const money = (v: string) => formatMoney(v, locale).replace(/^-/, "− ");
   const title = locale === "ar" ? inv.titleAr || inv.titleEn : inv.titleEn;
+  const filled = (v: string | null | undefined) => (v ?? "").trim();
+  const issuerLines = [
+    // the brand line already says "Eventor"
+    filled(inv.issuer.name).toLowerCase() === "eventor" ? "" : filled(inv.issuer.name),
+    filled(inv.issuer.address),
+    [
+      filled(inv.issuer.nif) && `NIF ${filled(inv.issuer.nif)}`,
+      filled(inv.issuer.rc) && `RC ${filled(inv.issuer.rc)}`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  ].filter(Boolean);
   const party = (p: Invoice["client"]) =>
     [p.businessName ? p.name : null, p.phone ? formatDzPhone(p.phone) : null, p.email]
       .filter(Boolean)
@@ -19,11 +31,12 @@ export function InvoiceDocument({ invoice: inv }: { invoice: Invoice }) {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="text-22 font-semibold text-brand">Eventor</div>
-          <div className="text-12 text-muted">{inv.issuer.name}</div>
-          <div className="text-12 text-muted">{inv.issuer.address}</div>
-          <div className="text-12 text-muted">
-            NIF {inv.issuer.nif} · RC {inv.issuer.rc}
-          </div>
+          {/* L-27: only the issuer fields that are filled — no bare "NIF · RC" labels or separators. */}
+          {issuerLines.map((line) => (
+            <div key={line} className="text-12 text-muted">
+              {line}
+            </div>
+          ))}
         </div>
         <div className="text-end">
           <div className="text-15 font-semibold text-ink">

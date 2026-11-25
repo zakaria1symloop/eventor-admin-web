@@ -51,7 +51,9 @@ export function SettingsScreen() {
 
   return (
     <UnsavedChangesGuard when={Object.values(dirty).some(Boolean)}>
-      <div className="grid items-start gap-5 lg:grid-cols-[200px_minmax(0,1fr)]">
+      {/* L-41: an explicit shrinkable column below lg, so the section nav's one-line row scrolls inside
+          its own width instead of widening the page (it was 1292 px wide at an 800 px viewport). */}
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[200px_minmax(0,1fr)]">
         <SectionNav sections={nav} aria-label={t("sectionsLabel")} />
         <div className="flex min-w-0 flex-col gap-4">
           {settings.isPending ? (

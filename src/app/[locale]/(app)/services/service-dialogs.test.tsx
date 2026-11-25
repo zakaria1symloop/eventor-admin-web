@@ -3,13 +3,23 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/errors";
 import { renderWithProviders } from "@/test/render";
-import { DeleteServiceDialog } from "./service-dialogs";
+import { DeleteServiceDialog, publishService, UnpublishServiceDialog } from "./service-dialogs";
 
 const deleteService = vi.fn();
+const serviceAction = vi.fn();
 vi.mock("@/lib/api/services", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/services")>()),
   deleteService: (...args: unknown[]) => deleteService(...args),
+  serviceAction: (...args: unknown[]) => serviceAction(...args),
 }));
+const toastError = vi.fn();
+vi.mock("@/components/feedback/toast", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/components/feedback/toast")>();
+  return {
+    ...real,
+    toast: Object.assign(Object.create(real.toast), { error: (...a: unknown[]) => toastError(...a) }),
+  };
+});
 
 const service = { id: "s1", title: "Wedding photo & video coverage", providerName: "Studio Lumière" };
 
@@ -85,5 +95,46 @@ describe("SRV-06 DeleteServiceDialog", () => {
     await user.click(screen.getByRole("button", { name: "Delete service" }));
     await waitFor(() => expect(onDeleted).toHaveBeenCalled());
     expect(deleteService).toHaveBeenCalledWith("s1", false);
+  });
+});
+
+describe("SRV-05 unpublish / publish (L-12)", () => {
+  beforeEach(() => {
+    serviceAction.mockReset();
+    toastError.mockReset();
+  });
+
+  it("asks before unpublishing, then sends unpublish", async () => {
+    const user = userEvent.setup();
+    const onDone = vi.fn();
+    serviceAction.mockResolvedValue({});
+    renderWithProviders(
+      <UnpublishServiceDialog service={service} open onOpenChange={() => undefined} onDone={onDone} />,
+    );
+    const dialog = screen.getByRole("dialog", { name: `Unpublish “${service.title}”?` });
+    expect(within(dialog).getByText(/goes back to drafts/)).toBeInTheDocument();
+    expect(serviceAction).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Unpublish" }));
+    await waitFor(() => expect(serviceAction).toHaveBeenCalledWith("s1", "unpublish"));
+    expect(onDone).toHaveBeenCalled();
+  });
+
+  it("a refused publish lists what is missing", async () => {
+    serviceAction.mockRejectedValue(
+      new ApiError({
+        status: 422,
+        code: "SERVICE_PUBLISH_INVALID",
+        message: "Missing",
+        details: { missing: ["photos", "wilayas"] },
+      }),
+    );
+    const t = (k: string) => k;
+    const onDone = vi.fn();
+    await publishService(service, t, onDone);
+    expect(serviceAction).toHaveBeenCalledWith("s1", "publish");
+    expect(toastError).toHaveBeenCalledWith("publishInvalid", {
+      description: "publishFields.photos · publishFields.wilayas",
+    });
+    expect(onDone).toHaveBeenCalled();
   });
 });

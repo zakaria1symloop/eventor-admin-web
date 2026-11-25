@@ -13,6 +13,7 @@ import {
   type DataColumn,
   type FilterConfig,
   type ListParams,
+  type ListResult,
   type QuickFilterItem,
 } from "@/components/data-list";
 import { ExportDialog } from "@/components/feedback/export-dialog";
@@ -53,6 +54,8 @@ export function RequestsScreen() {
   const catalog = useCatalog();
   const [exportOpen, setExportOpen] = useState(false);
   const [params, setParams] = useState<ListParams | null>(null);
+  // L-37: the export summary uses the list's own result (tab + search + filters), not the overall stats.
+  const [listResult, setListResult] = useState<ListResult | null>(null);
 
   const [days] = useState(() => {
     const at = (d: number) => new Date(Date.now() + d * 86400_000).toISOString().slice(0, 10);
@@ -329,6 +332,7 @@ export function RequestsScreen() {
         columnsStorageKey="academic-requests"
         itemLabel={t("itemLabel")}
         onParamsChange={setParams}
+        onResultChange={setListResult}
         onRowClick={(r) => router.push(requestHref(r))}
         rowMenuHeader={(r) => ({ title: r.title, subtitle: `${r.reference} · ${r.requester.name}` })}
         rowMenu={rowMenu}
@@ -347,12 +351,14 @@ export function RequestsScreen() {
       />
       <ExportDialog
         open={exportOpen}
+        activeFilters={listResult?.filters}
+        search={listResult?.q}
         onOpenChange={setExportOpen}
         resource="academic-requests"
         title={t("exportTitle")}
         filters={params ? exportFilters(params) : {}}
         summary={t("exportSummary", {
-          count: formatNumber(stats.data?.meta.total ?? 0, locale),
+          count: formatNumber(listResult?.total ?? stats.data?.meta.total ?? 0, locale),
           tab: t(`tabs.${params?.tab || "all"}`),
         })}
         columns={[

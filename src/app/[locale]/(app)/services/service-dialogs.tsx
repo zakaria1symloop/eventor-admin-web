@@ -10,6 +10,7 @@ import {
   deleteService,
   hideService,
   HIDE_REASONS,
+  publishMissing,
   serviceAction,
   updateService,
   type HideReason,
@@ -303,5 +304,66 @@ export async function toggleFeatured(
   } catch (e) {
     if (e instanceof ApiError && e.code === "FEATURED_LIMIT") toast.error(t("featuredLimit"));
     else toast.apiError(e);
+  }
+}
+
+/* ------------------------------------------------------------------ SRV-05 Unpublish / Publish */
+
+/** published → draft (`POST /admin/services/:id/unpublish`), confirmed, with Undo. */
+export function UnpublishServiceDialog({
+  service,
+  open,
+  onOpenChange,
+  onDone,
+}: {
+  service: ServiceTarget | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDone: () => void;
+}) {
+  const t = useTranslations("services.unpublish");
+  const ts = useTranslations("services");
+  if (!service) return null;
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      tone="warning"
+      icon={<EyeOff />}
+      title={t("title", { title: service.title })}
+      description={t("description")}
+      confirmLabel={t("confirm")}
+      onConfirm={async () => {
+        await serviceAction(service.id, "unpublish");
+        onDone();
+        toast.success(t("done", { title: service.title }), {
+          action: {
+            label: t("undo"),
+            onClick: () => void publishService(service, ts, onDone),
+          },
+        });
+      }}
+    />
+  );
+}
+
+/** draft → published; a refused publish lists what is missing (422 SERVICE_PUBLISH_INVALID). */
+export async function publishService(
+  service: ServiceTarget,
+  t: (key: string, values?: Record<string, string | number>) => string,
+  onDone: () => void,
+) {
+  try {
+    await serviceAction(service.id, "publish");
+    toast.success(t("publishedToast", { title: service.title }));
+  } catch (e) {
+    const missing = publishMissing(e, "SERVICE_PUBLISH_INVALID");
+    if (missing) {
+      toast.error(t("publishInvalid"), {
+        description: missing.map((m) => t(`publishFields.${m}`)).join(" · "),
+      });
+    } else toast.apiError(e);
+  } finally {
+    onDone();
   }
 }

@@ -160,7 +160,7 @@ export function PackDetailScreen({ id }: { id: string }) {
           {
             label: (
               <>
-                {td("by")}{" "}
+                {td("offeredBy")}{" "}
                 <Link href={`/users/${p.provider.id}`} className="font-medium text-brand hover:underline">
                   {providerName}
                   {p.provider.businessName ? ` (${p.provider.fullName})` : ""}

@@ -37,6 +37,9 @@ export function LogEntryDrawer({ id, onClose }: { id: string | null; onClose: ()
   const t = useTranslations("activityLog");
   const tp = useTranslations("bookings.status.parties");
   const locale = useLocale();
+  // L-38: a note is titled by who wrote it (a client's cancel reason is not "written by the admin").
+  const noteTitle = (role: string | null | undefined) =>
+    role && t.has(`detail.noteBy.${role}`) ? t(`detail.noteBy.${role}`) : t("detail.noteBy.none");
   // BUG-H4/M3: who cancelled a booking reads as a name, `system` as "Eventor (automatic)".
   const value = (field: string, v: unknown): ReactNode =>
     field === "cancelledBy" && typeof v === "string" && CANCELLED_BY.includes(v as CancelledBy)
@@ -151,7 +154,9 @@ export function LogEntryDrawer({ id, onClose }: { id: string | null; onClose: ()
             </section>
             {e.note && (
               <section>
-                <h3 className="mb-2 text-14 font-semibold text-ink">{t("detail.note")}</h3>
+                <h3 className="mb-2 text-14 font-semibold text-ink">
+                  {noteTitle(e.actorRole ?? e.actor?.role)}
+                </h3>
                 <p className="rounded-lg border border-border px-3 py-2.5 text-13 whitespace-pre-wrap text-ink">
                   {e.note}
                 </p>

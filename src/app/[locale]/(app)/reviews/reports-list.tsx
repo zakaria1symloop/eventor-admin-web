@@ -10,6 +10,7 @@ import {
   type DataColumn,
   type FilterConfig,
   type ListParams,
+  type ListResult,
 } from "@/components/data-list";
 import { ExportDialog } from "@/components/feedback/export-dialog";
 import { EmptyState } from "@/components/feedback/states";
@@ -51,6 +52,7 @@ export function ReportsList({
   const [action, setAction] = useState<{ id: string; mode: "resolve" | "dismiss" } | null>(null);
   const [converting, setConverting] = useState<string | null>(null);
   const [params, setParams] = useState<ListParams | null>(null);
+  const [listResult, setListResult] = useState<ListResult | null>(null);
   const [total, setTotal] = useState(0);
   // "Everything about this account" (profile Reports counter): name the person in the filter chip.
   const aboutUserId = typeof params?.filters.aboutUser === "string" ? params.filters.aboutUser : "";
@@ -239,6 +241,7 @@ export function ReportsList({
         savedViews={savedViewsSource("reports")}
         itemLabel={t("itemLabel")}
         onParamsChange={setParams}
+        onResultChange={setListResult}
         onRowClick={(r) => openTarget(r)}
         rowMenuHeader={(r) => ({ title: tr(`reasons.${r.reason}`), subtitle: r.target.label })}
         rowMenu={rowMenu}
@@ -264,6 +267,8 @@ export function ReportsList({
       />
       <ExportDialog
         open={exportOpen}
+        activeFilters={listResult?.filters}
+        search={listResult?.q}
         onOpenChange={onExportOpenChange}
         resource="reports"
         title={t("exportTitle")}

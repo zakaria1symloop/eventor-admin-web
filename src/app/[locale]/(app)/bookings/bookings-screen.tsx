@@ -32,6 +32,7 @@ import {
   type DataColumn,
   type FilterConfig,
   type ListParams,
+  type ListResult,
   type QuickFilterItem,
 } from "@/components/data-list";
 import { PersonCell } from "@/components/domain/deleted-user";
@@ -128,6 +129,8 @@ export function BookingsScreen() {
   const [invoiceFor, setInvoiceFor] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [params, setParams] = useState<ListParams | null>(null);
+  // L-37: the export summary uses the list's own result (tab + search + filters), not the overall stats.
+  const [listResult, setListResult] = useState<ListResult | null>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: bookingKeys.all });
 
@@ -432,6 +435,7 @@ export function BookingsScreen() {
         columnsStorageKey="bookings"
         itemLabel={t("itemLabel")}
         onParamsChange={setParams}
+        onResultChange={setListResult}
         onRowClick={(b) => router.push(bookingHref(b))}
         rowMenuHeader={(b) => ({
           title: `#${b.reference}`,
@@ -516,12 +520,14 @@ export function BookingsScreen() {
       />
       <ExportDialog
         open={exportOpen}
+        activeFilters={listResult?.filters}
+        search={listResult?.q}
         onOpenChange={setExportOpen}
         resource="bookings"
         title={t("exportTitle")}
         filters={params ? exportFilters(params) : {}}
         summary={t("exportSummary", {
-          count: formatNumber(stats.data?.meta.total ?? 0, locale),
+          count: formatNumber(listResult?.total ?? stats.data?.meta.total ?? 0, locale),
           tab: t(`tabs.${params?.tab || "all"}`),
         })}
         columns={[

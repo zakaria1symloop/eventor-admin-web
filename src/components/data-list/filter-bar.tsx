@@ -197,6 +197,35 @@ export function SortSelect({
 
 /* ------------------------------------------------------------------ FilterChips */
 
+/** One active filter as the chips show it: "Wilaya: Alger, Oran". */
+export interface ActiveFilter {
+  key: string;
+  label: string;
+  text: string;
+}
+
+/** Active filters with their chip labels (shared by the chips and the export summary, L-37). */
+export function describeFilters(
+  filters: FilterConfig[],
+  values: Record<string, string | string[]>,
+): ActiveFilter[] {
+  const seen = new Set<string>();
+  return filters
+    .filter((f) => {
+      if (values[f.key] === undefined || seen.has(f.key)) return false;
+      seen.add(f.key);
+      return true;
+    })
+    .map((f) => {
+      const v = values[f.key];
+      const list = Array.isArray(v) ? v : [v];
+      const text = f.format
+        ? f.format(v)
+        : list.map((x) => f.options.find((o) => o.value === x)?.label ?? x).join(", ");
+      return { key: f.key, label: f.label, text };
+    });
+}
+
 export function FilterChips({
   filters,
   values,
@@ -211,21 +240,12 @@ export function FilterChips({
   onSaveView?: () => void;
 }) {
   const t = useTranslations("dataList");
-  const seen = new Set<string>();
-  const active = filters.filter((f) => {
-    if (values[f.key] === undefined || seen.has(f.key)) return false;
-    seen.add(f.key);
-    return true;
-  });
+  const active = describeFilters(filters, values);
   if (active.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
-      {active.map((f) => {
-        const v = values[f.key];
-        const list = Array.isArray(v) ? v : [v];
-        const text = f.format
-          ? f.format(v)
-          : list.map((x) => f.options.find((o) => o.value === x)?.label ?? x).join(", ");
+      {active.map(({ key, label, text }) => {
+        const f = { key, label };
         return (
           <span
             key={f.key}

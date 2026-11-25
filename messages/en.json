@@ -768,7 +768,29 @@
       "store_url_ios": {
         "label": "App Store link",
         "hint": "Opened by \"Update now\" on iPhone. Empty until the app is published."
+      },
+      "booking_auto_expire": {
+        "label": "Decline unanswered requests automatically",
+        "hint": "A pending request is declined once the provider's reply deadline passes or its event starts. The client is told the request expired."
       }
+    },
+    "validation": {
+      "MIN": "Must be {min} or more.",
+      "MAX": "Must be {max} or less.",
+      "IS_INT": "Enter a whole number.",
+      "IS_NUMBER": "Enter a number.",
+      "MAX_DECIMAL_PLACES": "Use at most 2 decimal places.",
+      "IS_NOT_EMPTY": "This can't be empty.",
+      "MAX_LENGTH": "{maxLength} characters at most.",
+      "IS_EMAIL": "Enter a valid email address.",
+      "IS_PHONE": "Enter a valid phone number.",
+      "IS_URL": "Enter a web address starting with http:// or https://.",
+      "IS_SEMVER": "Use a version number like 1.4.0.",
+      "IS_ISO4217": "Use a 3-letter currency code, like DZD.",
+      "IS_IN": "Pick one of the listed options.",
+      "ARRAY_NOT_EMPTY": "Pick at least one.",
+      "WRONG_TYPE": "This value has the wrong format. Reload the page and try again.",
+      "SETTING_UNKNOWN": "This setting no longer exists. Reload the page."
     }
   },
   "admins": {
@@ -928,7 +950,9 @@
     "failed": "The export failed",
     "downloaded": "{count, plural, one {# row exported} other {# rows exported}}",
     "queuedTitle": "Export started",
-    "queuedDescription": "It's a big one: we'll email you a download link when it's ready."
+    "queuedDescription": "It's a big one: we'll email you a download link when it's ready.",
+    "noFilters": "No filter: every row of this tab",
+    "search": "Search “{q}”"
   },
   "activityLog": {
     "subtitle": "Every change made in the dashboard and every important event in the app. Entries can't be edited or deleted.",
@@ -1029,7 +1053,12 @@
       "requestId": "Request ID",
       "changes": "Changes",
       "noChanges": "No field changes recorded.",
-      "note": "Note written by the admin"
+      "noteBy": {
+        "client": "Note from the client",
+        "provider": "Note from the provider",
+        "admin": "Note from the admin",
+        "none": "Note"
+      }
     },
     "exportColumns": {
       "createdAt": "Date",
@@ -1074,7 +1103,9 @@
       "export_requested": "Exported a list",
       "saved_view_created": "Saved a view",
       "saved_view_updated": "Edited a saved view",
-      "saved_view_deleted": "Deleted a saved view"
+      "saved_view_deleted": "Deleted a saved view",
+      "booking_expired": "Request expired (no reply)",
+      "booking_reschedule_closed": "Reschedule proposal closed"
     }
   },
   "categories": {
@@ -2013,7 +2044,9 @@
       "unfeature": "Remove from home",
       "hide": "Hide service",
       "show": "Show service",
-      "delete": "Delete service"
+      "delete": "Delete service",
+      "publish": "Publish service",
+      "unpublish": "Unpublish"
     },
     "bulk": {
       "hide": "Hide",
@@ -2155,7 +2188,7 @@
       "notFoundTitle": "Service not found",
       "notFoundDescription": "This service doesn't exist or was deleted.",
       "backToServices": "Back to services",
-      "by": "by",
+      "offeredBy": "Offered by",
       "viewInApp": "View in app",
       "hide": "Hide service",
       "edit": "Edit service",
@@ -2347,6 +2380,15 @@
       "allowSimultaneous": "Allow several clients at the same time",
       "allowSimultaneousHint": "Ticked: different clients can book the same hours. Unticked: one client per time slot.",
       "allowSimultaneousOnePerDay": "Has no effect while “Only one booking per day” is ticked."
+    },
+    "publishedToast": "“{title}” published",
+    "publishInvalid": "Can't publish yet: some information is missing",
+    "unpublish": {
+      "title": "Unpublish “{title}”?",
+      "description": "It goes back to drafts and disappears from the app. It leaves the home featured list, and Ready Packs that contain it are marked “Needs attention”. You can publish it again any time.",
+      "confirm": "Unpublish",
+      "done": "“{title}” unpublished",
+      "undo": "Undo"
     }
   },
   "packs": {
@@ -2523,7 +2565,7 @@
       "notFoundTitle": "Pack not found",
       "notFoundDescription": "This pack doesn't exist or was deleted.",
       "backToPacks": "Back to Ready Packs",
-      "by": "By",
+      "offeredBy": "Offered by",
       "viewInApp": "View in app",
       "edit": "Edit pack",
       "attentionTitle": "This pack needs attention and is hidden from clients",
@@ -2900,7 +2942,9 @@
         "confirmed_by_both": "Confirmed by both parties",
         "completed_by_mistake": "Completed by mistake",
         "dispute_raised": "Dispute raised after completion",
-        "other": "Other"
+        "other": "Other",
+        "expired": "Expired (no reply)",
+        "account_blocked": "Account blocked"
       }
     },
     "reschedule": {
@@ -2935,7 +2979,10 @@
         "venue_change": "Venue changed",
         "weather": "Weather",
         "other": "Other"
-      }
+      },
+      "proposalNotPending": "This proposal was already answered or closed. The booking is shown up to date.",
+      "bookingNotEditable": "This booking has ended: its date can no longer change.",
+      "totalChange": "Total {old} → {new}"
     },
     "price": {
       "title": "Adjust price",
@@ -2964,7 +3011,9 @@
       "guests": "Guests",
       "clientNote": "Client note",
       "dateHint": "Use Reschedule to change the date",
-      "saved": "Event details saved"
+      "saved": "Event details saved",
+      "priceByHours": "{accepted, select, true {Priced per hour: changing the hours changes the price and issues a new invoice version.} other {Priced per hour: changing the hours changes the price.}}",
+      "priceByGuests": "{accepted, select, true {Priced per person: changing the guests changes the price and issues a new invoice version.} other {Priced per person: changing the guests changes the price.}}"
     },
     "invoice": {
       "title": "Invoice {number}",
@@ -3080,7 +3129,9 @@
         "eventDay": "Event day",
         "completed": "Completed & reviewed",
         "clientReview": "Client can leave a review"
-      }
+      },
+      "pendingTotal": "Total {old} → {new}",
+      "rescheduleClosed": "Reschedule proposal closed (booking {status})"
     },
     "createBooking": "Create booking"
   },

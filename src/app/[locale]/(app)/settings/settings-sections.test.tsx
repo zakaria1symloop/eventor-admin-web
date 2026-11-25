@@ -247,3 +247,130 @@ describe("L-07 settings changed in two tabs", () => {
     expect(screen.queryByText("Latest values loaded: changed meanwhile")).not.toBeInTheDocument();
   });
 });
+
+describe("BUG-F1 request expiry setting", () => {
+  const expire: SettingItem = {
+    key: "booking_auto_expire",
+    value: false,
+    type: "boolean",
+    min: null,
+    max: null,
+    sensitive: true,
+    updatedAt: T0,
+    updatedBy: null,
+  };
+
+  it("shows booking_auto_expire as a labelled toggle with its explanation, in EN and AR", () => {
+    const { unmount } = renderWithProviders(
+      <SettingsSectionCard sectionKey="bookings" items={[expire]} onDirtyChange={() => undefined} />,
+    );
+    expect(
+      screen.getByRole("switch", { name: "Decline unanswered requests automatically" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/A pending request is declined once the provider's reply deadline passes/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("booking_auto_expire")).not.toBeInTheDocument();
+    unmount();
+    renderWithProviders(
+      <SettingsSectionCard sectionKey="bookings" items={[expire]} onDirtyChange={() => undefined} />,
+      { locale: "ar" },
+    );
+    expect(
+      screen.getByRole("switch", { name: "رفض الطلبات التي لم يُرد عليها تلقائيًا" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("L-08 readable validation errors", () => {
+  const upload: SettingItem = {
+    key: "max_photo_upload_mb",
+    value: 10,
+    type: "integer",
+    min: 1,
+    max: 20,
+    sensitive: false,
+    updatedAt: T0,
+    updatedBy: null,
+  };
+  const version: SettingItem = {
+    key: "min_app_version",
+    value: "1.0.0",
+    type: "version",
+    min: null,
+    max: null,
+    maxLength: 20,
+    sensitive: false,
+    updatedAt: T0,
+    updatedBy: null,
+  };
+  const invalid = (details: { field: string; code: string; message: string }[]) =>
+    new ApiError({ status: 400, code: "VALIDATION_FAILED", message: "Some fields are invalid.", details });
+
+  beforeEach(() => {
+    updateSettings.mockReset();
+  });
+
+  it("maps MAX / MIN / IS_NOT_EMPTY to messages with the setting's limits and unit", async () => {
+    const user = userEvent.setup();
+    updateSettings
+      .mockRejectedValueOnce(
+        invalid([
+          {
+            field: "values.platform_fee_percent",
+            code: "MAX",
+            message: "platform_fee_percent must not be greater than 50",
+          },
+        ]),
+      )
+      .mockRejectedValueOnce(
+        invalid([
+          {
+            field: "values.max_photo_upload_mb",
+            code: "MIN",
+            message: "max_photo_upload_mb must not be less than 1",
+          },
+        ]),
+      );
+    const { unmount } = renderWithProviders(
+      <SettingsSectionCard sectionKey="commission" items={items} onDirtyChange={() => undefined} />,
+    );
+    await user.clear(screen.getByLabelText("Platform fee"));
+    await user.type(screen.getByLabelText("Platform fee"), "15");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Must be 50 % or less.")).toBeInTheDocument();
+    expect(screen.queryByText(/must not be greater than/)).not.toBeInTheDocument();
+    unmount();
+
+    renderWithProviders(
+      <SettingsSectionCard sectionKey="uploads" items={[upload]} onDirtyChange={() => undefined} />,
+    );
+    const input = screen.getByRole("textbox");
+    await user.clear(input);
+    await user.type(input, "5");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Must be 1 MB or more.")).toBeInTheDocument();
+  });
+
+  it("an empty required text, in Arabic", async () => {
+    const user = userEvent.setup();
+    updateSettings.mockRejectedValueOnce(
+      invalid([
+        {
+          field: "values.min_app_version",
+          code: "IS_NOT_EMPTY",
+          message: "min_app_version must not be empty",
+        },
+      ]),
+    );
+    renderWithProviders(
+      <SettingsSectionCard sectionKey="maintenance" items={[version]} onDirtyChange={() => undefined} />,
+      { locale: "ar" },
+    );
+    const input = screen.getAllByRole("textbox")[0];
+    await user.clear(input);
+    await user.type(input, "2.0.0");
+    await user.click(screen.getByRole("button", { name: "حفظ التغييرات" }));
+    expect(await screen.findByText("لا يمكن ترك هذا الحقل فارغًا.")).toBeInTheDocument();
+  });
+});

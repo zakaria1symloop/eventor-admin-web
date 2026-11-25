@@ -24,6 +24,7 @@ import {
   type DataColumn,
   type FilterConfig,
   type ListParams,
+  type ListResult,
   type QuickFilterItem,
 } from "@/components/data-list";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
@@ -79,6 +80,8 @@ export function ReviewsScreen() {
   const [dismissing, setDismissing] = useState<ReviewRow | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [params, setParams] = useState<ListParams | null>(null);
+  // L-37: the export summary uses the list's own result (tab + search + filters), not the overall stats.
+  const [listResult, setListResult] = useState<ListResult | null>(null);
   const reportsView = view === "reports";
 
   const [weekAgo] = useState(() => day(7));
@@ -376,6 +379,7 @@ export function ReviewsScreen() {
             columnsStorageKey="reviews"
             itemLabel={t("itemLabel")}
             onParamsChange={setParams}
+            onResultChange={setListResult}
             onRowClick={(r) => void setReviewId(r.id)}
             rowProps={(r) => ({ className: r.reportsOpen > 0 ? "bg-red-soft/30" : undefined })}
             rowMenuHeader={(r) => ({
@@ -393,12 +397,14 @@ export function ReviewsScreen() {
           />
           <ExportDialog
             open={exportOpen}
+            activeFilters={listResult?.filters}
+            search={listResult?.q}
             onOpenChange={setExportOpen}
             resource="reviews"
             title={t("exportTitle")}
             filters={params ? exportFilters(params) : {}}
             summary={t("exportSummary", {
-              count: formatNumber(stats.data?.meta.total ?? 0, locale),
+              count: formatNumber(listResult?.total ?? stats.data?.meta.total ?? 0, locale),
               tab: t(`tabs.${(params?.tab as (typeof TAB_OPTIONS)[number]) || "all"}`),
             })}
             columns={[

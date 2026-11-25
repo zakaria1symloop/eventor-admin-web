@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { requestKeys } from "@/lib/api/academic-requests";
 import { useAdminSocket } from "@/lib/api/admin-socket";
+import { adminKeys } from "@/lib/api/auth";
 import { disputeKeys } from "@/lib/api/disputes";
 import { notificationKeys } from "@/lib/api/notifications";
 import { onApiWrite } from "@/lib/api/client";
@@ -59,6 +60,9 @@ function SessionShell({ children }: { children: ReactNode }) {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       refreshCounts();
     },
+    // #24: an invitee accepted in their own browser (or an invitation / admin changed elsewhere):
+    // refresh Settings › Admin accounts without a reload.
+    onAdminsUpdated: () => void queryClient.invalidateQueries({ queryKey: adminKeys.all }),
   });
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;

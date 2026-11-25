@@ -29,6 +29,9 @@ export interface ExportDialogProps {
   /** "3,282 bookings · Tab All · Event date Mar 2026" */
   summary: ReactNode;
   summaryHint?: ReactNode;
+  /** L-37: the list's active filters (as its chips show them) and search, listed under the summary. */
+  activeFilters?: { label: string; text: string }[];
+  search?: string;
   columns: ExportColumnOption[];
   /** Test hooks. */
   pollIntervalMs?: number;
@@ -52,6 +55,8 @@ export function ExportDialog({
   filters,
   summary,
   summaryHint,
+  activeFilters,
+  search,
   columns,
   pollIntervalMs = 2000,
   maxPolls = 30,
@@ -143,6 +148,16 @@ export function ExportDialog({
           <div className="rounded-lg bg-canvas px-3 py-2.5">
             <div className="text-13 font-medium text-ink">{summary}</div>
             {summaryHint && <div className="text-12 text-muted">{summaryHint}</div>}
+            {activeFilters && (
+              <div className="mt-1 text-12 text-ink-2">
+                {activeFilters.length === 0 && !search
+                  ? t("noFilters")
+                  : [
+                      ...(search ? [t("search", { q: search })] : []),
+                      ...activeFilters.map((f) => `${f.label}: ${f.text}`),
+                    ].join(" · ")}
+              </div>
+            )}
           </div>
           <Field label={t("format")}>
             <Select

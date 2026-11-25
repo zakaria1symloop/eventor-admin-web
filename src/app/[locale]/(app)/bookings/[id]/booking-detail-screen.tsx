@@ -44,6 +44,7 @@ import {
   remindProvider,
   type AllowedTransition,
   type BookingDetail,
+  type BookingHistoryEntry,
   type StatusAction,
 } from "@/lib/api/bookings";
 import { ApiError } from "@/lib/api/errors";
@@ -292,7 +293,19 @@ export function BookingDetailScreen({ id }: { id: string }) {
           icon={<CalendarDays />}
           className="mb-4"
           title={td("pendingDate", { date: formatDate(`${b.pendingReschedule.newDate}T12:00:00`, locale) })}
-          description={td("pendingDateBy", { name: b.pendingReschedule.proposedBy.fullName })}
+          description={[
+            td("pendingDateBy", { name: b.pendingReschedule.proposedBy.fullName }),
+            b.pendingReschedule.oldTotal &&
+            b.pendingReschedule.newTotal &&
+            b.pendingReschedule.oldTotal !== b.pendingReschedule.newTotal
+              ? td("pendingTotal", {
+                  old: formatMoney(b.pendingReschedule.oldTotal, locale),
+                  new: formatMoney(b.pendingReschedule.newTotal, locale),
+                })
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
           action={
             <Button variant="secondary" size="sm" onClick={() => setOverlay("reschedule")}>
               {td("manage")}
@@ -620,6 +633,8 @@ function WhoAndWhat({ booking: b }: { booking: BookingDetail }) {
 function EventDetailsCard({ booking: b, onEdit }: { booking: BookingDetail; onEdit?: () => void }) {
   const td = useTranslations("bookings.detail");
   const tp = useTranslations("packs");
+  const tr = useTranslations("bookings.status.reasons");
+  const reasonLabel = (code: string) => (tr.has(code) ? tr(code) : code);
   const locale = useLocale();
   const row = (label: ReactNode, value: ReactNode) => (
     <div className="flex items-baseline justify-between gap-4 py-2 text-13">
@@ -667,12 +682,13 @@ function EventDetailsCard({ booking: b, onEdit }: { booking: BookingDetail; onEd
           <p className="mt-1 text-13 whitespace-pre-line text-ink">“{b.clientNote}”</p>
         </div>
       )}
+      {/* Reason codes read as labels (BUG-F1: `expired` → "Expired (no reply)"); unknown codes stay as sent. */}
       {(b.cancelReason || b.declineReason) && (
         <div className="border-t border-border px-[18px] py-3 text-13 text-ink-2">
-          {b.declineReason && td("declineReason", { reason: b.declineReason })}
+          {b.declineReason && td("declineReason", { reason: reasonLabel(b.declineReason) })}
           {b.cancelReason &&
             td("cancelReason", {
-              reason: b.cancelReason,
+              reason: reasonLabel(b.cancelReason),
               by: b.cancelledBy ? td(`by.${b.cancelledBy}`) : "—",
             })}
         </div>
@@ -787,6 +803,14 @@ function HistoryCard({ booking: b }: { booking: BookingDetail }) {
   const td = useTranslations("bookings.detail");
   const locale = useLocale();
   const actionLabel = useActionLabel();
+  const ts = useTranslations("status.booking");
+  // BUG-E7: "Reschedule proposal closed (booking cancelled)" — `changes.reason` is the booking's new status.
+  const historyTitle = (h: BookingHistoryEntry) => {
+    const reason = h.changes?.reason;
+    if (h.action === "booking.reschedule_closed" && typeof reason === "string" && ts.has(reason))
+      return td("rescheduleClosed", { status: ts(reason) });
+    return actionLabel(h.action);
+  };
   return (
     <Card>
       <CardHeader
@@ -802,7 +826,7 @@ function HistoryCard({ booking: b }: { booking: BookingDetail }) {
           empty={td("noHistory")}
           items={b.history.slice(0, 8).map((h) => ({
             key: h.id,
-            title: actionLabel(h.action),
+            title: historyTitle(h),
             meta: [h.actor?.fullName ?? td("system"), formatDateTime(h.createdAt, locale), h.note]
               .filter(Boolean)
               .join(" · "),

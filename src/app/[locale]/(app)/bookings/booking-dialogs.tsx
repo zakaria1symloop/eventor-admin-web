@@ -34,6 +34,7 @@ import {
   changeBookingPrice,
   changeBookingStatus,
   downloadInvoicePdf,
+  getBooking,
   getInvoice,
   bookingKeys,
   LINE_KINDS,
@@ -318,7 +319,9 @@ export function RescheduleDialog({
       if (e instanceof ApiError && e.code === "DATE_UNAVAILABLE") {
         setConflict(true);
         setError(null);
-      } else setError(e instanceof Error ? e.message : String(e));
+      } else if (e instanceof ApiError && e.code === "BOOKING_NOT_EDITABLE")
+        setError(t("bookingNotEditable"));
+      else setError(e instanceof Error ? e.message : String(e));
     },
   });
   const cancelProposal = useMutation({
@@ -327,7 +330,19 @@ export function RescheduleDialog({
       toast.success(t("proposalCancelled"));
       onDone(detail);
     },
-    onError: (e) => toast.apiError(e),
+    onError: (e) => {
+      // BUG-E7: the proposal was answered or closed meanwhile, or the booking has ended:
+      // say so, and reload the booking so the stale proposal disappears.
+      if (
+        e instanceof ApiError &&
+        (e.code === "RESCHEDULE_NOT_PENDING" || e.code === "BOOKING_NOT_EDITABLE")
+      ) {
+        toast.info(t(e.code === "RESCHEDULE_NOT_PENDING" ? "proposalNotPending" : "bookingNotEditable"));
+        void getBooking(booking!.id).then(onDone, () => undefined);
+        return;
+      }
+      toast.apiError(e);
+    },
   });
 
   if (!booking) return null;
@@ -335,6 +350,11 @@ export function RescheduleDialog({
   const needsForce = busy || conflict;
   const dateLabel = (d: string) => formatDate(`${d}T12:00:00`, locale);
   const providerName = booking.provider.businessName ?? booking.provider.fullName;
+  /** BUG-E5: a proposal that changes the price shows old → new total. */
+  const totalChange = (r: Reschedule) =>
+    r.oldTotal && r.newTotal && r.oldTotal !== r.newTotal
+      ? t("totalChange", { old: formatMoney(r.oldTotal, locale), new: formatMoney(r.newTotal, locale) })
+      : null;
 
   function confirm() {
     setSubmitted(true);
@@ -377,10 +397,15 @@ export function RescheduleDialog({
             <Banner
               tone="amber"
               title={t("pendingTitle", { date: dateLabel(pending.newDate) })}
-              description={t("pendingDescription", {
-                name: pending.proposedBy.fullName,
-                date: formatDateTime(pending.createdAt, locale),
-              })}
+              description={[
+                t("pendingDescription", {
+                  name: pending.proposedBy.fullName,
+                  date: formatDateTime(pending.createdAt, locale),
+                }),
+                totalChange(pending),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
               action={
                 <Button
                   variant="secondary"
@@ -695,6 +720,12 @@ export function EventDetailsDrawer({
               )}
             />
           </div>
+          {/* BUG-E3: per-hour and per-person bookings are repriced by these fields. */}
+          {booking.offer.priceType === "per_hour" && (
+            <p className="-mt-1 text-12 text-amber">
+              {t("priceByHours", { accepted: String(booking.status === "accepted") })}
+            </p>
+          )}
           <Controller
             control={form.control}
             name="wilayaCode"
@@ -717,7 +748,15 @@ export function EventDetailsDrawer({
             control={form.control}
             name="guests"
             render={({ field, fieldState }) => (
-              <Field label={t("guests")} error={fieldState.error?.message}>
+              <Field
+                label={t("guests")}
+                error={fieldState.error?.message}
+                hint={
+                  booking.offer.priceType === "per_person"
+                    ? t("priceByGuests", { accepted: String(booking.status === "accepted") })
+                    : undefined
+                }
+              >
                 <NumberInput value={field.value ?? null} onValueChange={field.onChange} />
               </Field>
             )}

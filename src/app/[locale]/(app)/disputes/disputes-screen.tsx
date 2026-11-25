@@ -29,6 +29,7 @@ import {
   type DataColumn,
   type FilterConfig,
   type ListParams,
+  type ListResult,
   type QuickFilterItem,
 } from "@/components/data-list";
 import { ExportDialog } from "@/components/feedback/export-dialog";
@@ -95,6 +96,8 @@ export function DisputesScreen() {
   const [closing, setClosing] = useState<DisputeRow | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [params, setParams] = useState<ListParams | null>(null);
+  // L-37: the export summary uses the list's own result (tab + search + filters), not the overall stats.
+  const [listResult, setListResult] = useState<ListResult | null>(null);
 
   const [days] = useState(() => new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10));
   const stats = useQuery({
@@ -346,6 +349,7 @@ export function DisputesScreen() {
         columnsStorageKey="disputes"
         itemLabel={t("itemLabel")}
         onParamsChange={setParams}
+        onResultChange={setListResult}
         onRowClick={(d) => router.push(disputeHref(d))}
         rowProps={(d) => ({
           className: d.status === "open" && !d.assignedAdmin ? "bg-red-soft/30" : undefined,
@@ -382,12 +386,14 @@ export function DisputesScreen() {
       <CloseDisputeDialog dispute={closing} open={!!closing} onOpenChange={(o) => !o && setClosing(null)} />
       <ExportDialog
         open={exportOpen}
+        activeFilters={listResult?.filters}
+        search={listResult?.q}
         onOpenChange={setExportOpen}
         resource="disputes"
         title={t("exportTitle")}
         filters={params ? exportFilters(params) : {}}
         summary={t("exportSummary", {
-          count: formatNumber(stats.data?.meta.total ?? 0, locale),
+          count: formatNumber(listResult?.total ?? stats.data?.meta.total ?? 0, locale),
           tab: t(`tabs.${params?.tab || "open"}`),
         })}
         columns={[

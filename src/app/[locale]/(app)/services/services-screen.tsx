@@ -12,7 +12,9 @@ import {
   Plus,
   Smartphone,
   Star,
+  Send,
   Trash2,
+  Undo2,
   UserRound,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -27,6 +29,7 @@ import {
   type DataColumn,
   type FilterConfig,
   type ListParams,
+  type ListResult,
   type QuickFilterItem,
 } from "@/components/data-list";
 import { ExportDialog } from "@/components/feedback/export-dialog";
@@ -52,8 +55,10 @@ import {
   ChangeCategoryDialog,
   DeleteServiceDialog,
   HideServiceDialog,
+  publishService,
   showServices,
   toggleFeatured,
+  UnpublishServiceDialog,
   type ServiceTarget,
 } from "./service-dialogs";
 import { useCatalog } from "./use-service-options";
@@ -97,11 +102,14 @@ export function ServicesScreen() {
   const catalog = useCatalog();
 
   const [hiding, setHiding] = useState<{ rows: ServiceTarget[]; clear?: () => void } | null>(null);
+  const [unpublishing, setUnpublishing] = useState<ServiceTarget | null>(null);
   const [deleting, setDeleting] = useState<ServiceRow | null>(null);
   const [bulkDelete, setBulkDelete] = useState<{ rows: ServiceTarget[]; clear: () => void } | null>(null);
   const [recategorize, setRecategorize] = useState<{ rows: ServiceTarget[]; clear: () => void } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [params, setParams] = useState<ListParams | null>(null);
+  // L-37: the export summary uses the list's own result (tab + search + filters), not the overall stats.
+  const [listResult, setListResult] = useState<ListResult | null>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: serviceKeys.all });
 
@@ -311,6 +319,18 @@ export function ServicesScreen() {
               disabled: s.status !== "published",
               onSelect: () => setHiding({ rows: [target] }),
             },
+        // SRV-05: unpublish (back to draft) next to Hide; a draft can be published from the list.
+        ...(s.status === "published"
+          ? [{ icon: <Undo2 />, label: t("menu.unpublish"), onSelect: () => setUnpublishing(target) }]
+          : s.status === "draft"
+            ? [
+                {
+                  icon: <Send />,
+                  label: t("menu.publish"),
+                  onSelect: () => void publishService(target, t, () => void invalidate()),
+                },
+              ]
+            : []),
       ],
       [{ icon: <Trash2 />, label: t("menu.delete"), danger: true, onSelect: () => setDeleting(s) }],
     ];
@@ -365,6 +385,7 @@ export function ServicesScreen() {
         columnsStorageKey="services"
         itemLabel={t("itemLabel")}
         onParamsChange={setParams}
+        onResultChange={setListResult}
         onRowClick={(s) => router.push(serviceHref(s))}
         rowMenuHeader={(s) => ({
           title: localTitle(s, locale),
@@ -439,6 +460,12 @@ export function ServicesScreen() {
         }
       />
 
+      <UnpublishServiceDialog
+        service={unpublishing}
+        open={!!unpublishing}
+        onOpenChange={(o) => !o && setUnpublishing(null)}
+        onDone={() => void invalidate()}
+      />
       <HideServiceDialog
         services={hiding?.rows ?? []}
         open={!!hiding}
@@ -483,12 +510,14 @@ export function ServicesScreen() {
       />
       <ExportDialog
         open={exportOpen}
+        activeFilters={listResult?.filters}
+        search={listResult?.q}
         onOpenChange={setExportOpen}
         resource="services"
         title={t("exportTitle")}
         filters={params ? exportFilters(params) : {}}
         summary={t("exportSummary", {
-          count: formatNumber(stats.data?.meta.total ?? 0, locale),
+          count: formatNumber(listResult?.total ?? stats.data?.meta.total ?? 0, locale),
           tab: t(`tabs.${params?.tab || "all"}`),
         })}
         columns={[

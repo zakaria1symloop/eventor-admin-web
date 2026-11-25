@@ -34,6 +34,7 @@ import {
   type DataColumn,
   type FilterConfig,
   type ListParams,
+  type ListResult,
   type QuickFilterItem,
 } from "@/components/data-list";
 import { ExportDialog } from "@/components/feedback/export-dialog";
@@ -99,6 +100,8 @@ export function UsersScreen() {
   const [bulk, setBulk] = useState<{ action: BulkAction; rows: UserRow[]; clear: () => void } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [params, setParams] = useState<ListParams | null>(null);
+  // L-37: the export summary uses the list's own result (tab + search + filters), not the overall stats.
+  const [listResult, setListResult] = useState<ListResult | null>(null);
 
   const editing = useUser(dialog.edit);
   const invalidate = () => queryClient.invalidateQueries({ queryKey: userKeys.all });
@@ -457,6 +460,7 @@ export function UsersScreen() {
         columnsStorageKey="users"
         itemLabel={t("itemLabel")}
         onParamsChange={setParams}
+        onResultChange={setListResult}
         onRowClick={(u) => router.push(userHref(u))}
         rowMenuHeader={(u) => ({
           title: u.fullName,
@@ -582,12 +586,14 @@ export function UsersScreen() {
       />
       <ExportDialog
         open={exportOpen}
+        activeFilters={listResult?.filters}
+        search={listResult?.q}
         onOpenChange={setExportOpen}
         resource="users"
         title={t("exportTitle")}
         filters={params ? exportFilters(params) : {}}
         summary={t("exportSummary", {
-          count: formatNumber(stats.data?.meta.total ?? 0, locale),
+          count: formatNumber(listResult?.total ?? stats.data?.meta.total ?? 0, locale),
           tab: t(`tabs.${params?.tab || "all"}`),
         })}
         columns={[

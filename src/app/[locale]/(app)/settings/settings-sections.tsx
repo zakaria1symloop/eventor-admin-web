@@ -28,7 +28,7 @@ import {
   type Settings,
   type SettingSectionKey,
 } from "@/lib/api/settings";
-import { ApiError } from "@/lib/api/errors";
+import { ApiError, type ValidationDetail } from "@/lib/api/errors";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format";
 
@@ -62,6 +62,9 @@ const INFO_AFTER: Partial<Record<string, "cancellationPolicy">> = {
 const INVOICE_FIELDS: (keyof InvoiceIssuer)[] = ["name", "address", "nif", "rc", "email", "phone"];
 
 export type Draft = Record<string, SettingValue>;
+
+/** Type checks the API runs on a value (all mean "this value has the wrong kind"). */
+const WRONG_TYPE_CODES = new Set(["IS_BOOLEAN", "IS_STRING", "IS_ARRAY", "IS_OBJECT"]);
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -209,7 +212,9 @@ export function SettingsSectionCard({
       return true;
     }
     if (e instanceof ApiError && e.fieldErrors.length > 0) {
-      setErrors(Object.fromEntries(e.fieldErrors.map((f) => [f.field.replace(/^values\./, ""), f.message])));
+      setErrors(
+        Object.fromEntries(e.fieldErrors.map((f) => [f.field.replace(/^values\./, ""), fieldMessage(f)])),
+      );
       return true;
     }
     return false;
@@ -232,6 +237,27 @@ export function SettingsSectionCard({
   const lastChanged = items
     .filter((i) => i.updatedBy && i.updatedAt)
     .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))[0];
+
+  /**
+   * L-08: VALIDATION_FAILED `details[]` (`values.<key>` + code) → a readable EN/AR message. Limits come from the
+   * setting itself (`GET /admin/settings`), else from the API's message (nested fields like invoice_issuer.nif).
+   */
+  function fieldMessage(f: ValidationDetail): string {
+    const field = f.field.replace(/^values\./, "");
+    const key = field.split(".")[0];
+    const item = items.find((i) => i.key === key);
+    const fromMessage = f.message.match(/(\d+(?:\.\d+)?)(?!.*\d)/)?.[1] ?? "";
+    const limit = (v: number | null | undefined) =>
+      String(v !== null && v !== undefined && field === key ? (display(key, v) ?? v) : fromMessage);
+    const code = WRONG_TYPE_CODES.has(f.code)
+      ? "WRONG_TYPE"
+      : f.code === "REQUIRED"
+        ? "IS_NOT_EMPTY"
+        : f.code;
+    const k = `validation.${code}`;
+    if (!t.has(k)) return f.message;
+    return t(k, { min: limit(item?.min), max: limit(item?.max), maxLength: limit(item?.maxLength) });
+  }
 
   function label(key: string) {
     return t.has(`fields.${key}.label`) ? t(`fields.${key}.label`) : key;
