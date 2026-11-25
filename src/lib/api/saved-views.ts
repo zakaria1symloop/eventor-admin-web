@@ -70,5 +70,6 @@ export function savedViewsSource(resource: string): SavedViewsSource {
     queryFn: () => listSavedViews(resource),
     onSave: (input) => createSavedView({ resource, ...input }),
     onDelete: (view) => deleteSavedView(view.id),
+    onRename: (view, name) => updateSavedView(view.id, { name }),
   };
 }

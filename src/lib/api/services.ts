@@ -250,7 +250,10 @@ export interface AvailabilityBlock {
   booking: { id: string; reference: string; status: string; clientName: string | null } | null;
   note: string | null;
   removable: boolean;
+  /** Who made a manual block (BUG-F6/M1): the provider (app) or Eventor (dashboard). Holds and bookings: `provider`. */
+  source: BlockSource;
 }
+export type BlockSource = "provider" | "admin";
 export interface AvailabilityDay {
   date: string;
   status: DayStatus;
@@ -343,6 +346,28 @@ export async function deleteService(id: string, force = false): Promise<ServiceD
 }
 
 /* photos (services and packs share the shape) */
+
+/** Who blocked a day: one source when every manual block of the day has it, `mixed` otherwise, null without one. */
+export function dayBlockSource(day: Pick<AvailabilityDay, "items">): BlockSource | "mixed" | null {
+  const sources = new Set(day.items.filter((i) => i.kind === "blocked").map((i) => i.source));
+  if (sources.size === 0) return null;
+  return sources.size === 1 ? [...sources][0] : "mixed";
+}
+
+/** `services.availability` message key for a day's status, naming who blocked it when that is clear. */
+export function dayStatusKey(day: Pick<AvailabilityDay, "status" | "items">): string {
+  if (day.status !== "blocked") return `status.${day.status}`;
+  const source = dayBlockSource(day);
+  if (source === "admin") return "status.blockedByEventor";
+  if (source === "provider") return "status.blockedByProvider";
+  return "status.blocked";
+}
+
+/** `services.availability` message key for one item of a day (a block says who made it). */
+export function itemKindKey(item: Pick<AvailabilityBlock, "kind" | "source">): string {
+  if (item.kind !== "blocked") return `kind.${item.kind}`;
+  return item.source === "admin" ? "kind.blockedByEventor" : "kind.blockedByProvider";
+}
 
 export async function uploadPhoto(resource: "services" | "packs", id: string, file: File): Promise<Photo[]> {
   const form = new FormData();

@@ -52,10 +52,12 @@ function booking(over: Partial<BookingDetail> = {}): BookingDetail {
       phone: null,
       bookingsCount: 7,
       status: "active",
+      deleted: false,
     },
     provider: {
       id: "p1",
       fullName: "Karim Belkacem",
+      deleted: false,
       businessName: "Studio Lumière",
       avatarUrl: null,
       email: "k@x.dz",

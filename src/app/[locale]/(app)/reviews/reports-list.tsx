@@ -56,7 +56,7 @@ export function ReportsList({
   const aboutUserId = typeof params?.filters.aboutUser === "string" ? params.filters.aboutUser : "";
   const aboutUser = useQuery({
     queryKey: userKeys.detail(aboutUserId),
-    queryFn: () => getUser(aboutUserId),
+    queryFn: () => getUser(aboutUserId, { includeDeleted: true }),
     enabled: !!aboutUserId,
     retry: false,
   });

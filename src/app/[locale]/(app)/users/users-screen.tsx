@@ -235,6 +235,8 @@ export function UsersScreen() {
         { value: "ar", label: t("form.languages.ar") },
       ],
     },
+    // BUG-M5 (opt-in): also list deleted accounts (includeDeleted=true); without it nothing changes.
+    { key: "deleted", label: t("filters.deleted"), type: "toggle", toggleLabel: t("filters.showDeleted") },
   ];
 
   const target = (u: UserRow): UserTarget => ({
@@ -273,7 +275,12 @@ export function UsersScreen() {
     {
       id: "status",
       header: t("columns.status"),
-      cell: (u) => <StatusBadgeCell domain="user" status={u.status} />,
+      cell: (u) =>
+        u.deletedAt ? (
+          <StatusBadgeCell domain="user" status="deleted" />
+        ) : (
+          <StatusBadgeCell domain="user" status={u.status} />
+        ),
     },
     {
       id: "verification",
@@ -350,34 +357,37 @@ export function UsersScreen() {
 
   const rowMenu = (u: UserRow) => {
     const provider = u.role === "provider";
+    const views = [
+      { icon: <Eye />, label: t("menu.openProfile"), href: userHref(u) },
+      ...(provider
+        ? [
+            {
+              icon: <Briefcase />,
+              label: t("menu.viewServices"),
+              href: `/services?provider=${u.id}`,
+              hint: u.servicesCount ?? 0,
+            },
+          ]
+        : []),
+      {
+        icon: <CalendarDays />,
+        label: t("menu.viewBookings"),
+        href: provider ? `/bookings?provider=${u.id}` : `/bookings?client=${u.id}`,
+        hint: u.bookingsCount,
+      },
+      {
+        icon: <Star />,
+        label: t("menu.viewReviews"),
+        href: provider ? `/reviews?provider=${u.id}` : `/reviews?author=${u.id}`,
+        hint: provider ? (u.ratingCount ?? 0) : undefined,
+      },
+      { icon: <MessageCircle />, label: t("menu.viewConversations"), href: `/messages?user=${u.id}` },
+      { icon: <TriangleAlert />, label: t("menu.viewDisputes"), href: `/disputes?tab=all&userId=${u.id}` },
+    ];
+    // BUG-M5: a deleted account is read-only (every action answers 404 USER_NOT_FOUND).
+    if (u.deletedAt) return [views];
     return [
-      [
-        { icon: <Eye />, label: t("menu.openProfile"), href: userHref(u) },
-        ...(provider
-          ? [
-              {
-                icon: <Briefcase />,
-                label: t("menu.viewServices"),
-                href: `/services?provider=${u.id}`,
-                hint: u.servicesCount ?? 0,
-              },
-            ]
-          : []),
-        {
-          icon: <CalendarDays />,
-          label: t("menu.viewBookings"),
-          href: provider ? `/bookings?provider=${u.id}` : `/bookings?client=${u.id}`,
-          hint: u.bookingsCount,
-        },
-        {
-          icon: <Star />,
-          label: t("menu.viewReviews"),
-          href: provider ? `/reviews?provider=${u.id}` : `/reviews?author=${u.id}`,
-          hint: provider ? (u.ratingCount ?? 0) : undefined,
-        },
-        { icon: <MessageCircle />, label: t("menu.viewConversations"), href: `/messages?user=${u.id}` },
-        { icon: <TriangleAlert />, label: t("menu.viewDisputes"), href: `/disputes?tab=all&userId=${u.id}` },
-      ],
+      views,
       [
         { icon: <Pencil />, label: t("menu.edit"), onSelect: () => void setDialog({ edit: u.id }) },
         ...(provider

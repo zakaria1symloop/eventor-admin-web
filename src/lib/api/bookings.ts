@@ -79,11 +79,15 @@ export interface BookingClientRef {
   id: string;
   fullName: string;
   avatarUrl: string | null;
+  /** BUG-M5: the account was deleted: "Deleted user", no profile link (the profile answers 404). */
+  deleted: boolean;
 }
 export interface BookingProviderRef {
   id: string;
   fullName: string;
   businessName: string | null;
+  /** BUG-M5: the account was deleted: "Deleted user", no profile link (the profile answers 404). */
+  deleted: boolean;
 }
 
 export interface BookingRow {

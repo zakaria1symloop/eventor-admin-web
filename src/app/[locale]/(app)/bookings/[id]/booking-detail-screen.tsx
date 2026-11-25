@@ -51,6 +51,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatDate, formatDateTime, formatMoney, initials, intlLocale } from "@/lib/utils/format";
 import { canOpenDispute } from "@/lib/api/bookings";
 import { localName } from "../../users/use-user-options";
+import { DeletedUserBadge } from "@/components/domain/deleted-user";
 import { useActionLabel } from "../../activity-log/action-label";
 import {
   EventDetailsDrawer,
@@ -470,6 +471,7 @@ function PartyColumn({
   userId,
   bookingsHref,
   messageHref,
+  deleted,
 }: {
   label: string;
   name: string;
@@ -478,6 +480,8 @@ function PartyColumn({
   userId: string;
   bookingsHref: string;
   messageHref: string;
+  /** BUG-M5: a deleted account has no profile (404) and can't be messaged. */
+  deleted?: boolean;
 }) {
   const td = useTranslations("bookings.detail");
   return (
@@ -493,25 +497,36 @@ function PartyColumn({
           </span>
         )}
         <span className="min-w-0 leading-tight">
-          <Link
-            href={`/users/${userId}`}
-            className="block truncate text-15 font-medium text-brand hover:underline"
-          >
-            {name}
-          </Link>
+          {deleted ? (
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-15 font-medium text-ink-2">{name}</span>
+              <DeletedUserBadge />
+            </span>
+          ) : (
+            <Link
+              href={`/users/${userId}`}
+              className="block truncate text-15 font-medium text-brand hover:underline"
+            >
+              {name}
+            </Link>
+          )}
           <span className="block truncate text-12 text-muted">{sub}</span>
         </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-13 font-medium text-brand">
-        <Link href={`/users/${userId}`} className="hover:underline">
-          {td("openProfile")}
-        </Link>
+        {!deleted && (
+          <Link href={`/users/${userId}`} className="hover:underline">
+            {td("openProfile")}
+          </Link>
+        )}
         <Link href={bookingsHref} className="hover:underline">
           {td("theirBookings")}
         </Link>
-        <Link href={messageHref} className="hover:underline">
-          {td("message")}
-        </Link>
+        {!deleted && (
+          <Link href={messageHref} className="hover:underline">
+            {td("message")}
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -539,6 +554,7 @@ function WhoAndWhat({ booking: b }: { booking: BookingDetail }) {
           avatar={b.client.avatarUrl}
           sub={td("clientSub", { count: b.client.bookingsCount })}
           userId={b.client.id}
+          deleted={b.client.deleted}
           bookingsHref={`/bookings?client=${b.client.id}`}
           messageHref={msg(b.client.id)}
         />
@@ -555,6 +571,7 @@ function WhoAndWhat({ booking: b }: { booking: BookingDetail }) {
             .filter(Boolean)
             .join(" · ")}
           userId={b.provider.id}
+          deleted={b.provider.deleted}
           bookingsHref={`/bookings?provider=${b.provider.id}`}
           messageHref={msg(b.provider.id)}
         />

@@ -20,7 +20,10 @@ import {
   objectHref,
 } from "@/lib/api/activity-log";
 import { intlLocale } from "@/lib/utils/format";
+import type { CancelledBy } from "@/lib/api/bookings";
 import { useActionLabel } from "./action-label";
+
+const CANCELLED_BY: CancelledBy[] = ["client", "provider", "admin", "system"];
 
 function show(v: unknown): ReactNode {
   if (v === undefined || v === null || v === "") return null;
@@ -32,7 +35,13 @@ function show(v: unknown): ReactNode {
 /** LOG-02 — entry detail drawer (`?entry=<id>`). Read-only. */
 export function LogEntryDrawer({ id, onClose }: { id: string | null; onClose: () => void }) {
   const t = useTranslations("activityLog");
+  const tp = useTranslations("bookings.status.parties");
   const locale = useLocale();
+  // BUG-H4/M3: who cancelled a booking reads as a name, `system` as "Eventor (automatic)".
+  const value = (field: string, v: unknown): ReactNode =>
+    field === "cancelledBy" && typeof v === "string" && CANCELLED_BY.includes(v as CancelledBy)
+      ? tp(v)
+      : show(v);
   const router = useRouter();
   const actionLabel = useActionLabel();
   const entry = useQuery({
@@ -132,8 +141,8 @@ export function LogEntryDrawer({ id, onClose }: { id: string | null; onClose: ()
                 <DiffList
                   rows={rows.map((r) => ({
                     label: <span dir="ltr">{r.field}</span>,
-                    old: show(r.old),
-                    new: show(r.new),
+                    old: value(r.field, r.old),
+                    new: value(r.field, r.new),
                   }))}
                 />
               ) : (

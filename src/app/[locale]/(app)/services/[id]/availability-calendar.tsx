@@ -15,7 +15,9 @@ import { Link } from "@/i18n/navigation";
 import { ApiError } from "@/lib/api/errors";
 import {
   createBlock,
+  dayStatusKey,
   deleteBlock,
+  itemKindKey,
   getAvailability,
   localTitle,
   serviceKeys,
@@ -142,7 +144,7 @@ export function AvailabilityCalendar({
                 type="button"
                 role="gridcell"
                 data-status={c.status}
-                aria-label={`${c.date} · ${t(`status.${c.status}`)}`}
+                aria-label={`${c.date} · ${t(dayStatusKey(c))}`}
                 onClick={() => setOpenDay(c)}
                 className={cn(
                   "flex flex-col items-center justify-center rounded-md text-13 tabular-nums transition-colors",
@@ -265,7 +267,7 @@ function DayDialog({
     <DialogRoot open={!!day} onOpenChange={onOpenChange}>
       <DialogContent
         title={label}
-        description={day ? t(`status.${day.status}`) : undefined}
+        description={day ? t(dayStatusKey(day)) : undefined}
         icon={<Lock />}
         width={500}
         footer={
@@ -291,7 +293,7 @@ function DayDialog({
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block font-medium text-ink">
-                      {t(`kind.${it.kind}`)} ·{" "}
+                      {t(itemKindKey(it))} ·{" "}
                       {it.startTime && it.endTime ? `${it.startTime}–${it.endTime}` : t("wholeDay")}
                     </span>
                     <span className="block truncate text-12 text-muted">
@@ -351,7 +353,7 @@ function DayDialog({
                 onCheckedChange={setOnlyService}
               />
             )}
-            <Field label={t("note")}>
+            <Field label={t("note")} hint={t("noteHint")}>
               <Textarea rows={2} value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
             </Field>
           </div>

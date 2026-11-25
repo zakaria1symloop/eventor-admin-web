@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Ban, Check, Copy, KeyRound, LogOut, Trash2, Unlock } from "lucide-react";
+import { Ban, Check, Copy, Info, KeyRound, LogOut, Trash2, Unlock } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
@@ -85,6 +85,12 @@ export function BlockUserDialog({
   const i = impact.data;
   const isProvider = user.role === "provider";
 
+  const pending = i?.pendingBookings ?? 0;
+  const upcoming = i?.upcomingBookings ?? 0;
+  // BUG-M4: `bookings` covers pending requests AND accepted bookings whose event is not over.
+  const hasBookings = pending + upcoming > 0;
+  const party = isProvider ? "Provider" : "Client";
+
   const lines: string[] = [];
   if (impact.isPending) lines.push(t("impactLoading"));
   else if (impact.isError) lines.push(t("impactError"));
@@ -93,9 +99,15 @@ export function BlockUserDialog({
     if (isProvider && i.servicesCount > 0) lines.push(t("impactServices", { count: i.servicesCount }));
     if (isProvider && i.packsCount > 0) lines.push(t("impactPacks", { count: i.packsCount }));
     if (i.conversations > 0) lines.push(t("impactConversations", { count: i.conversations }));
-    if (i.upcomingBookings > 0) lines.push(t("impactUpcoming", { count: i.upcomingBookings }));
+    // The bookings lines follow the choice below, so the list and the radio always agree.
+    if (bookings === "cancel") {
+      if (pending > 0) lines.push(t("impactPendingCancelled", { count: pending }));
+      if (upcoming > 0) lines.push(t("impactUpcomingCancelled", { count: upcoming }));
+    } else {
+      if (pending > 0) lines.push(t("impactPendingKept", { count: pending }));
+      if (upcoming > 0) lines.push(t(`impactUpcomingKept${party}`, { count: upcoming }));
+    }
   }
-  const pending = i?.pendingBookings ?? 0;
 
   return (
     <ConfirmDialog
@@ -127,29 +139,27 @@ export function BlockUserDialog({
           reason,
           until: untilFor(duration),
           message: message.trim() || null,
-          bookings: pending > 0 ? bookings : "keep",
+          bookings: hasBookings ? bookings : "keep",
         });
         onBlocked?.(result);
       }}
     >
-      {pending > 0 && (
+      {hasBookings && (
         <div>
-          <div className="mb-2 text-13 font-medium text-ink">
-            {t("bookingsTitle", { pending, upcoming: i?.upcomingBookings ?? 0 })}
-          </div>
+          <div className="mb-2 text-13 font-medium text-ink">{t("bookingsTitle", { pending, upcoming })}</div>
           <RadioCards
-            aria-label={t("bookingsTitle", { pending, upcoming: i?.upcomingBookings ?? 0 })}
+            aria-label={t("bookingsTitle", { pending, upcoming })}
             value={bookings}
             onValueChange={(v) => setBookings(v as BookingChoice)}
             options={[
-              {
-                value: "cancel",
-                label: isProvider ? t("cancelProvider") : t("cancelClient"),
-                description: isProvider ? t("cancelProviderHint") : t("cancelClientHint"),
-              },
-              { value: "keep", label: t("keep"), description: t("keepHint") },
+              { value: "cancel", label: t(`cancel${party}`), description: t(`cancel${party}Hint`) },
+              { value: "keep", label: t("keep"), description: t(`keep${party}Hint`) },
             ]}
           />
+          <p className="mt-2 flex items-center gap-1.5 text-12 text-muted">
+            <Info className="size-3.5 shrink-0" aria-hidden />
+            {t("unblockNoRestore")}
+          </p>
         </div>
       )}
     </ConfirmDialog>

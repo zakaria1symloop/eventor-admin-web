@@ -51,6 +51,8 @@ export interface UserRow {
   servicesCount: number | null;
   lastActiveAt: string | null;
   createdAt: string;
+  /** BUG-M5: set on a deleted account (listed only with `includeDeleted=true`; its profile is read-only). */
+  deletedAt?: string | null;
 }
 
 export interface UserTabCounts {
@@ -275,6 +277,8 @@ export function usersQuery(
     maxCompletedBookings: bookings.to || undefined,
     lastActive: one("lastActive"),
     language: one("language"),
+    // BUG-M5 "Show deleted accounts" (opt-in): without it nothing changes.
+    includeDeleted: one("deleted") === "true" ? true : undefined,
     sort: p.sort || undefined,
     page: p.page,
     limit: p.limit,
@@ -286,8 +290,13 @@ export function listUsers(query: QueryParams): Promise<UserList> {
   return api.get<UserList>("/admin/users", { query });
 }
 
-export async function getUser(id: string): Promise<UserDetail> {
-  return (await api.get<DataResponse<UserDetail>>(`/admin/users/${id}`)).data;
+/** `includeDeleted`: a deleted account answers read-only (`deletedAt` set) instead of 404 USER_NOT_FOUND. */
+export async function getUser(id: string, opts: { includeDeleted?: boolean } = {}): Promise<UserDetail> {
+  return (
+    await api.get<DataResponse<UserDetail>>(`/admin/users/${id}`, {
+      query: opts.includeDeleted ? { includeDeleted: true } : undefined,
+    })
+  ).data;
 }
 
 export async function createUser(body: CreateUserBody): Promise<UserDetail> {

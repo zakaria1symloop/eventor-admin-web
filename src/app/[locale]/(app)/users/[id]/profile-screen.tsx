@@ -93,7 +93,8 @@ export function ProfileScreen({ id }: { id: string }) {
   const locale = useLocale();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const query = useUser(id);
+  // BUG-M5: a deleted account opens read-only instead of 404 (old links from disputes, chats…).
+  const query = useUser(id, { includeDeleted: true });
   const [edit, setEdit] = useQueryState("edit", parseAsString.withOptions({ history: "replace" }));
   const [overlay, setOverlay] = useState<Overlay>(null);
 
@@ -141,6 +142,7 @@ export function ProfileScreen({ id }: { id: string }) {
 
   const u = query.data;
   const provider = u.role === "provider";
+  const deleted = !!u.deletedAt;
   const target: UserTarget = {
     id: u.id,
     fullName: u.fullName,
@@ -293,7 +295,17 @@ export function ProfileScreen({ id }: { id: string }) {
         className="mb-4"
       />
 
-      {blocked && u.block && (
+      {deleted && (
+        <Banner
+          tone="gray"
+          icon={<UserX />}
+          className="mb-4 border border-border py-3.5"
+          title={tp("deletedTitle", { date: formatDateTime(u.deletedAt!, locale) })}
+          description={tp("deletedDescription")}
+        />
+      )}
+
+      {!deleted && blocked && u.block && (
         <Banner
           tone="red"
           icon={<Ban />}
@@ -328,7 +340,7 @@ export function ProfileScreen({ id }: { id: string }) {
         title={u.fullName}
         badges={[
           <StatusBadge key="role" domain="role" status={u.role} />,
-          <StatusBadge key="status" domain="user" status={u.status} />,
+          <StatusBadge key="status" domain="user" status={deleted ? "deleted" : u.status} />,
           ...(provider
             ? [
                 <StatusBadge
@@ -342,22 +354,24 @@ export function ProfileScreen({ id }: { id: string }) {
         ]}
         meta={meta}
         actions={
-          <>
-            <Button
-              variant="secondary"
-              icon={<MessageCircle />}
-              onClick={() => router.push(`/messages?new=1&to=${u.id}`)}
-            >
-              {tp("message")}
-            </Button>
-            <Button variant="secondary" icon={<Pencil />} onClick={() => void setEdit("1")}>
-              {tp("editDetails")}
-            </Button>
-            <ActionMenu
-              groups={actionsMenu}
-              trigger={<Button icon={<ChevronDown />}>{tp("actionsMenu")}</Button>}
-            />
-          </>
+          deleted ? null : (
+            <>
+              <Button
+                variant="secondary"
+                icon={<MessageCircle />}
+                onClick={() => router.push(`/messages?new=1&to=${u.id}`)}
+              >
+                {tp("message")}
+              </Button>
+              <Button variant="secondary" icon={<Pencil />} onClick={() => void setEdit("1")}>
+                {tp("editDetails")}
+              </Button>
+              <ActionMenu
+                groups={actionsMenu}
+                trigger={<Button icon={<ChevronDown />}>{tp("actionsMenu")}</Button>}
+              />
+            </>
+          )
         }
       >
         <LinkedCounts items={counts} />
@@ -367,7 +381,7 @@ export function ProfileScreen({ id }: { id: string }) {
 
       <EditUserDrawer
         user={u}
-        open={edit === "1"}
+        open={edit === "1" && !deleted}
         onOpenChange={(o) => !o && void setEdit(null)}
         onSaved={() => void invalidate()}
       />
@@ -492,8 +506,8 @@ function ProfileTabs({ user: u, onOverlay }: { user: UserDetail; onOverlay: (o: 
           <DocumentsCard user={u} />
         </div>
       )}
-      {current === "services" && <ProviderServicesTab providerId={u.id} />}
-      {current === "packs" && <ProviderPacksTab providerId={u.id} />}
+      {current === "services" && <ProviderServicesTab providerId={u.id} readOnly={!!u.deletedAt} />}
+      {current === "packs" && <ProviderPacksTab providerId={u.id} readOnly={!!u.deletedAt} />}
       {current === "reviews" && (
         <ReviewsCard scope={provider ? { providerId: u.id } : { authorId: u.id }} written={!provider} />
       )}
@@ -525,7 +539,7 @@ function ProfileTabs({ user: u, onOverlay }: { user: UserDetail; onOverlay: (o: 
 
 /* ------------------------------------------------------------------ services / packs tabs (modules 6–7) */
 
-function ProviderServicesTab({ providerId }: { providerId: string }) {
+function ProviderServicesTab({ providerId, readOnly }: { providerId: string; readOnly?: boolean }) {
   const tp = useTranslations("users.profile");
   const locale = useLocale();
   const query = useQuery({
@@ -539,12 +553,14 @@ function ProviderServicesTab({ providerId }: { providerId: string }) {
         subtitle={query.data ? tp("servicesTotal", { count: query.data.meta.total }) : undefined}
         actions={
           <>
-            <Link
-              href={`/services/new?provider=${providerId}`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-13 font-medium text-ink hover:bg-canvas"
-            >
-              <Plus className="size-4" aria-hidden /> {tp("actions.addService")}
-            </Link>
+            {!readOnly && (
+              <Link
+                href={`/services/new?provider=${providerId}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-13 font-medium text-ink hover:bg-canvas"
+              >
+                <Plus className="size-4" aria-hidden /> {tp("actions.addService")}
+              </Link>
+            )}
             <span className="text-13 font-medium text-brand">
               <SectionLink href={`/services?provider=${providerId}`}>{tp("openInServices")}</SectionLink>
             </span>
@@ -594,7 +610,7 @@ function ProviderServicesTab({ providerId }: { providerId: string }) {
   );
 }
 
-function ProviderPacksTab({ providerId }: { providerId: string }) {
+function ProviderPacksTab({ providerId, readOnly }: { providerId: string; readOnly?: boolean }) {
   const tp = useTranslations("users.profile");
   const locale = useLocale();
   const query = useQuery({
@@ -607,12 +623,14 @@ function ProviderPacksTab({ providerId }: { providerId: string }) {
         title={tp("packs")}
         actions={
           <>
-            <Link
-              href={`/packs/new?provider=${providerId}`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-13 font-medium text-ink hover:bg-canvas"
-            >
-              <Plus className="size-4" aria-hidden /> {tp("createPack")}
-            </Link>
+            {!readOnly && (
+              <Link
+                href={`/packs/new?provider=${providerId}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-13 font-medium text-ink hover:bg-canvas"
+              >
+                <Plus className="size-4" aria-hidden /> {tp("createPack")}
+              </Link>
+            )}
             <span className="text-13 font-medium text-brand">
               <SectionLink href={`/packs?provider=${providerId}`}>{tp("openInPacks")}</SectionLink>
             </span>
@@ -803,7 +821,7 @@ function Overview({ user: u, onOverlay }: { user: UserDetail; onOverlay: (o: Ove
       <AccountDetailsCard user={u} />
       {provider && <DocumentsCard user={u} />}
       <NotesCard user={u} />
-      <AccountControlsCard user={u} onOverlay={onOverlay} />
+      {!u.deletedAt && <AccountControlsCard user={u} onOverlay={onOverlay} />}
     </>
   );
 
@@ -885,13 +903,15 @@ function AccountDetailsCard({ user: u }: { user: UserDetail }) {
       <CardHeader
         title={tp("accountDetails")}
         action={
-          <button
-            type="button"
-            onClick={() => void setEdit("1")}
-            className="inline-flex items-center gap-1 hover:underline"
-          >
-            {tp("edit")} <Pencil className="size-3.5" aria-hidden />
-          </button>
+          !u.deletedAt && (
+            <button
+              type="button"
+              onClick={() => void setEdit("1")}
+              className="inline-flex items-center gap-1 hover:underline"
+            >
+              {tp("edit")} <Pencil className="size-3.5" aria-hidden />
+            </button>
+          )
         }
       />
       <CardBody className="py-2">
@@ -942,7 +962,7 @@ function DocumentsCard({ user: u }: { user: UserDetail }) {
               <span className="block text-13 font-medium text-ink">{documentTypeLabel(tu, doc.type)}</span>
               <span className="block text-12 text-muted">{tu(`documentStatus.${doc.status}`)}</span>
             </span>
-            {doc.status !== "missing" && (
+            {doc.status !== "missing" && !u.deletedAt && (
               <Link
                 href={`/verifications/${u.id}?doc=${doc.type}`}
                 aria-label={tp("viewDocument", { type: documentTypeLabel(tu, doc.type) })}
@@ -954,9 +974,11 @@ function DocumentsCard({ user: u }: { user: UserDetail }) {
           </li>
         ))}
       </ul>
-      <div className="border-t border-border px-[18px] py-3 text-13 font-medium text-brand">
-        <SectionLink href={`/verifications/${u.id}`}>{tp("reviewDocuments")}</SectionLink>
-      </div>
+      {!u.deletedAt && (
+        <div className="border-t border-border px-[18px] py-3 text-13 font-medium text-brand">
+          <SectionLink href={`/verifications/${u.id}`}>{tp("reviewDocuments")}</SectionLink>
+        </div>
+      )}
     </Card>
   );
 }
@@ -986,7 +1008,8 @@ function NotesCard({ user: u }: { user: UserDetail }) {
       <CardHeader
         title={tp("notes")}
         action={
-          !adding && (
+          !adding &&
+          !u.deletedAt && (
             <button
               type="button"
               onClick={() => setAdding(true)}
@@ -1033,7 +1056,7 @@ function NotesCard({ user: u }: { user: UserDetail }) {
                 {n.author.fullName} · {formatDate(n.createdAt, locale)} · {tp("onlyAdmins")}
               </p>
             </div>
-            {n.canDelete && (
+            {n.canDelete && !u.deletedAt && (
               <IconButton
                 label={tp("deleteNote")}
                 size="sm"
@@ -1081,8 +1104,12 @@ function AccountControlsCard({
       <CardBody className="flex flex-col gap-3">
         <p className="text-13 text-ink-2">
           {provider
-            ? tp("controlsProvider", { services: s.services?.published ?? 0, pending: s.bookings.pending })
-            : tp("controlsClient", { upcoming: s.bookings.upcoming })}
+            ? tp("controlsProvider", {
+                services: s.services?.published ?? 0,
+                pending: s.bookings.pending,
+                upcoming: s.bookings.upcoming,
+              })
+            : tp("controlsClient", { pending: s.bookings.pending, upcoming: s.bookings.upcoming })}
         </p>
         <div className="flex flex-wrap gap-2">
           {blocked ? (

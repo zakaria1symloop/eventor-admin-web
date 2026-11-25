@@ -2,7 +2,7 @@
 
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
-import { Bookmark, ChevronDown, Eye, Layers, Trash2, Users } from "lucide-react";
+import { Bookmark, ChevronDown, Eye, Layers, Pencil, Trash2, Users } from "lucide-react";
 import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { DROPDOWN_COLLISION_PADDING, menuSurface } from "@/components/ui/dropdown";
 import { DialogContent, DialogRoot } from "@/components/feedback/dialog";
 import { toast } from "@/components/feedback/toast";
+import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
+import { ApiError } from "@/lib/api/errors";
 
 /* ------------------------------------------------------------------ QuickFilterCards */
 
@@ -230,6 +232,8 @@ export interface SavedViewsSource {
     query: Record<string, string | string[]>;
   }) => Promise<unknown>;
   onDelete?: (view: SavedView) => Promise<unknown>;
+  /** PATCH /admin/saved-views/:id { name } — 409 SAVED_VIEW_NAME_TAKEN. */
+  onRename?: (view: SavedView, name: string) => Promise<unknown>;
 }
 
 export function SavedViewsMenu({
@@ -239,7 +243,7 @@ export function SavedViewsMenu({
   onApply,
   onSaveCurrent,
 }: {
-  source?: Pick<SavedViewsSource, "queryKey" | "queryFn" | "onDelete">;
+  source?: Pick<SavedViewsSource, "queryKey" | "queryFn" | "onDelete" | "onRename">;
   views?: SavedView[];
   activeViewId?: string | null;
   onApply: (view: SavedView) => void;
@@ -255,6 +259,14 @@ export function SavedViewsMenu({
   const mine = views.filter((v) => v.isMine);
   const shared = views.filter((v) => !v.isMine);
   const active = views.find((v) => v.id === activeViewId);
+  // BUG-L1: the row's own actions open a dialog; the row itself applies the view.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleting, setDeleting] = useState<SavedView | null>(null);
+  const [renaming, setRenaming] = useState<SavedView | null>(null);
+  const openDialog = (open: (v: SavedView) => void, v: SavedView) => {
+    setMenuOpen(false);
+    open(v);
+  };
 
   const group = (title: string, list: SavedView[]) => (
     <Dropdown.Group>
@@ -266,6 +278,17 @@ export function SavedViewsMenu({
         <Dropdown.Item
           key={v.id}
           onSelect={() => onApply(v)}
+          onKeyDown={(e) => {
+            if (!v.isMine) return;
+            // Keyboard access to the row's actions: Delete removes, F2 renames.
+            if (e.key === "Delete" && source?.onDelete) {
+              e.preventDefault();
+              openDialog(setDeleting, v);
+            } else if (e.key === "F2" && source?.onRename) {
+              e.preventDefault();
+              openDialog(setRenaming, v);
+            }
+          }}
           className="group flex h-8 cursor-pointer items-center gap-2 rounded-sm px-2 text-13 text-ink outline-none data-[highlighted]:bg-canvas"
         >
           {v.isShared ? (
@@ -277,23 +300,20 @@ export function SavedViewsMenu({
             {v.name}
           </span>
           {!v.isMine && v.ownerName && <span className="text-11 text-faint">{v.ownerName}</span>}
+          {/* Owner only (DELETE / PATCH answer 403 NOT_OWNER on another admin's view). */}
+          {v.isMine && source?.onRename && (
+            <RowAction label={t("rename", { name: v.name })} onActivate={() => openDialog(setRenaming, v)}>
+              <Pencil className="size-3.5" aria-hidden />
+            </RowAction>
+          )}
           {v.isMine && source?.onDelete && (
-            <span
-              role="button"
-              tabIndex={-1}
-              aria-label={t("delete", { name: v.name })}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                source.onDelete!(v).then(
-                  () => void query.refetch(),
-                  (err) => toast.apiError(err),
-                );
-              }}
-              className="hidden size-6 items-center justify-center rounded-sm text-muted group-data-[highlighted]:flex hover:text-red"
+            <RowAction
+              label={t("delete", { name: v.name })}
+              danger
+              onActivate={() => openDialog(setDeleting, v)}
             >
               <Trash2 className="size-3.5" aria-hidden />
-            </span>
+            </RowAction>
           )}
         </Dropdown.Item>
       ))}
@@ -301,40 +321,177 @@ export function SavedViewsMenu({
   );
 
   return (
-    <Dropdown.Root>
-      <Dropdown.Trigger asChild>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<Eye />}
-          iconEnd={<ChevronDown className="opacity-70" />}
-          className="h-9"
-          aria-label={active ? `${t("views")}: ${active.name}` : t("views")}
-          title={t("views")}
-        >
-          {active && <span className="max-w-[140px] truncate">{active.name}</span>}
-        </Button>
-      </Dropdown.Trigger>
-      <Dropdown.Portal>
-        <Dropdown.Content
-          align="end"
-          sideOffset={6}
-          collisionPadding={DROPDOWN_COLLISION_PADDING}
-          className={cn(menuSurface, "w-[260px]")}
-        >
-          {group(t("myViews"), mine)}
-          <Dropdown.Separator className="-mx-1.5 my-1 h-px bg-border" />
-          {group(t("sharedViews"), shared)}
-          <Dropdown.Separator className="-mx-1.5 my-1 h-px bg-border" />
-          <Dropdown.Item
-            onSelect={onSaveCurrent}
-            className="flex h-8 cursor-pointer items-center rounded-sm px-2 text-13 font-medium text-brand outline-none data-[highlighted]:bg-canvas"
+    <>
+      <Dropdown.Root open={menuOpen} onOpenChange={setMenuOpen}>
+        <Dropdown.Trigger asChild>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Eye />}
+            iconEnd={<ChevronDown className="opacity-70" />}
+            className="h-9"
+            aria-label={active ? `${t("views")}: ${active.name}` : t("views")}
+            title={t("views")}
           >
-            {t("saveCurrent")}
-          </Dropdown.Item>
-        </Dropdown.Content>
-      </Dropdown.Portal>
-    </Dropdown.Root>
+            {active && <span className="max-w-[140px] truncate">{active.name}</span>}
+          </Button>
+        </Dropdown.Trigger>
+        <Dropdown.Portal>
+          <Dropdown.Content
+            align="end"
+            sideOffset={6}
+            collisionPadding={DROPDOWN_COLLISION_PADDING}
+            className={cn(menuSurface, "w-[260px]")}
+          >
+            {group(t("myViews"), mine)}
+            <Dropdown.Separator className="-mx-1.5 my-1 h-px bg-border" />
+            {group(t("sharedViews"), shared)}
+            <Dropdown.Separator className="-mx-1.5 my-1 h-px bg-border" />
+            <Dropdown.Item
+              onSelect={onSaveCurrent}
+              className="flex h-8 cursor-pointer items-center rounded-sm px-2 text-13 font-medium text-brand outline-none data-[highlighted]:bg-canvas"
+            >
+              {t("saveCurrent")}
+            </Dropdown.Item>
+          </Dropdown.Content>
+        </Dropdown.Portal>
+      </Dropdown.Root>
+      <ConfirmDialog
+        open={!!deleting}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        tone="danger"
+        icon={<Trash2 />}
+        title={t("deleteTitle", { name: deleting?.name ?? "" })}
+        description={deleting?.isShared ? t("deleteSharedDescription") : t("deleteDescription")}
+        confirmLabel={t("deleteConfirm")}
+        onConfirm={async () => {
+          if (!deleting || !source?.onDelete) return;
+          await source.onDelete(deleting);
+          toast.success(t("deleted", { name: deleting.name }));
+          void query.refetch();
+        }}
+      />
+      <RenameViewDialog
+        view={renaming}
+        onOpenChange={(o) => !o && setRenaming(null)}
+        onRename={async (name) => {
+          if (!renaming || !source?.onRename) return;
+          await source.onRename(renaming, name);
+          void query.refetch();
+        }}
+      />
+    </>
+  );
+}
+
+/**
+ * An action inside a saved-view row. Radix menu items select on pointer-up (before `click`), so the
+ * pointer events must not reach the row, or the click applies the view instead (BUG-L1).
+ */
+function RowAction({
+  label,
+  danger,
+  onActivate,
+  children,
+}: {
+  label: string;
+  danger?: boolean;
+  onActivate: () => void;
+  children: ReactNode;
+}) {
+  const stop = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  return (
+    <span
+      role="button"
+      tabIndex={-1}
+      aria-label={label}
+      title={label}
+      onPointerDown={stop}
+      onPointerUp={stop}
+      onClick={(e) => {
+        stop(e);
+        onActivate();
+      }}
+      className={cn(
+        "hidden size-6 items-center justify-center rounded-sm text-muted group-data-[highlighted]:flex",
+        danger ? "hover:text-red" : "hover:text-ink",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function RenameViewDialog({
+  view,
+  onOpenChange,
+  onRename,
+}: {
+  view: SavedView | null;
+  onOpenChange: (open: boolean) => void;
+  onRename: (name: string) => Promise<unknown>;
+}) {
+  const t = useTranslations("views");
+  const tc = useTranslations("common");
+  const [name, setName] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastId, setLastId] = useState<string | null>(null);
+  if ((view?.id ?? null) !== lastId) {
+    setLastId(view?.id ?? null);
+    setName(view?.name ?? "");
+    setError(null);
+  }
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const next = name.trim();
+    if (!next) return setError(tc("required"));
+    if (next === view?.name) return onOpenChange(false);
+    setPending(true);
+    try {
+      await onRename(next);
+      toast.success(t("renamed", { name: next }));
+      onOpenChange(false);
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.code === "SAVED_VIEW_NAME_TAKEN"
+          ? t("nameTaken")
+          : err instanceof Error
+            ? err.message
+            : String(err),
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <DialogRoot open={!!view} onOpenChange={onOpenChange}>
+      <DialogContent
+        title={t("renameTitle")}
+        icon={<Pencil />}
+        width={440}
+        footer={
+          <>
+            <span className="me-auto" />
+            <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
+              {tc("cancel")}
+            </Button>
+            <Button type="submit" form="rename-view-form" loading={pending}>
+              {t("renameSave")}
+            </Button>
+          </>
+        }
+      >
+        <form id="rename-view-form" onSubmit={submit} className="flex flex-col gap-4" noValidate>
+          <Field label={t("name")} required error={error}>
+            <TextInput value={name} maxLength={120} onChange={(e) => setName(e.target.value)} autoFocus />
+          </Field>
+        </form>
+      </DialogContent>
+    </DialogRoot>
   );
 }
 

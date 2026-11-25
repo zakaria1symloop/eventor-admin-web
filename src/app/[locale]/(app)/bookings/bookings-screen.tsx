@@ -26,7 +26,6 @@ import { useMemo, useState } from "react";
 import {
   DataList,
   EntityCell,
-  LinkCell,
   MoneyCell,
   StackCell,
   type AdvancedFilterField,
@@ -35,6 +34,7 @@ import {
   type ListParams,
   type QuickFilterItem,
 } from "@/components/data-list";
+import { PersonCell } from "@/components/domain/deleted-user";
 import { ExportDialog } from "@/components/feedback/export-dialog";
 import { EmptyState } from "@/components/feedback/states";
 import { PageHeader } from "@/components/layout/page-header";
@@ -269,7 +269,8 @@ export function BookingsScreen() {
       id: "client",
       header: t("columns.client"),
       cell: (b) => (
-        <LinkCell
+        <PersonCell
+          deleted={b.client.deleted}
           href={`/users/${b.client.id}`}
           label={b.client.fullName}
           sub={[t("clientRole"), b.guests ? t("guests", { count: b.guests }) : null]
@@ -282,7 +283,8 @@ export function BookingsScreen() {
       id: "provider",
       header: t("columns.provider"),
       cell: (b) => (
-        <LinkCell
+        <PersonCell
+          deleted={b.provider.deleted}
           href={`/users/${b.provider.id}`}
           label={b.provider.businessName ?? b.provider.fullName}
           sub={b.provider.businessName ? b.provider.fullName : undefined}
@@ -328,8 +330,13 @@ export function BookingsScreen() {
     return [
       [
         { icon: <Eye />, label: t("menu.open"), href: bookingHref(b), shortcut: t("menu.enter") },
-        { icon: <UserRound />, label: t("menu.openClient"), href: `/users/${b.client.id}` },
-        { icon: <Briefcase />, label: t("menu.openProvider"), href: `/users/${b.provider.id}` },
+        // BUG-M5: no profile link for a deleted account (its profile answers 404).
+        ...(b.client.deleted
+          ? []
+          : [{ icon: <UserRound />, label: t("menu.openClient"), href: `/users/${b.client.id}` }]),
+        ...(b.provider.deleted
+          ? []
+          : [{ icon: <Briefcase />, label: t("menu.openProvider"), href: `/users/${b.provider.id}` }]),
         ...(offer ? [offer] : []),
         { icon: <MessageCircle />, label: t("menu.openConversation"), href: `/messages?booking=${b.id}` },
       ],

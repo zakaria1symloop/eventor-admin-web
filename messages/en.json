@@ -190,7 +190,8 @@
     "savedInActivityLog": "Saved in the activity log",
     "undo": "Undo",
     "saveChanges": "Save changes",
-    "back": "Back"
+    "back": "Back",
+    "deletedUser": "Deleted user"
   },
   "breadcrumb": {
     "manage": "Manage",
@@ -901,7 +902,17 @@
     "share": "Share with all admins",
     "shareHint": "Other admins see it under Shared views.",
     "save": "Save view",
-    "saved": "View “{name}” saved"
+    "saved": "View “{name}” saved",
+    "rename": "Rename view {name}",
+    "renameTitle": "Rename view",
+    "renameSave": "Rename",
+    "renamed": "View renamed to “{name}”",
+    "nameTaken": "You already have a view with this name in this list.",
+    "deleteTitle": "Delete the view “{name}”?",
+    "deleteDescription": "Only you could see it. The list itself does not change.",
+    "deleteSharedDescription": "It is also removed for the admins it is shared with. The list itself does not change.",
+    "deleteConfirm": "Delete view",
+    "deleted": "View “{name}” deleted"
   },
   "export": {
     "description": "Uses the current tab, search and filters.",
@@ -1313,7 +1324,7 @@
     "exportSummary": "{count} users · Tab {tab}",
     "undo": "Undo",
     "blockedToast": "{name} blocked",
-    "blockedToastHint": "{count, plural, one {# booking cancelled} other {# bookings cancelled}}",
+    "blockedToastHint": "{count, plural, =0 {No booking cancelled} one {# booking cancelled; Undo unblocks but does not restore it} other {# bookings cancelled; Undo unblocks but does not restore them}}",
     "unblockedToast": "{name} unblocked",
     "stats": {
       "active": "Active accounts",
@@ -1357,7 +1368,9 @@
         "90d": "In the last 90 days",
         "never": "Never"
       },
-      "language": "Language"
+      "language": "Language",
+      "deleted": "Deleted accounts",
+      "showDeleted": "Show deleted accounts"
     },
     "form": {
       "languages": {
@@ -1437,12 +1450,12 @@
       "blockTitle": "{count, plural, one {Block # user?} other {Block # users?}}",
       "unblockTitle": "{count, plural, one {Unblock # user?} other {Unblock # users?}}",
       "deleteTitle": "{count, plural, one {Delete # user?} other {Delete # users?}}",
-      "blockDescription": "They can't sign in until you unblock them. You can undo this from their profile.",
+      "blockDescription": "They can't sign in until you unblock them. You can undo this from their profile. Unblocking does not restore cancelled bookings.",
       "unblockDescription": "They can sign in again. Their services and packs become visible again.",
       "deleteDescription": "Personal data is removed after 30 days. Past bookings, invoices and reviews stay as “Deleted user”. Accounts with upcoming bookings or open disputes are skipped.",
       "message": "Message sent to the users",
       "messagePlaceholder": "Optional. Sent by email and shown when they try to sign in.",
-      "cancelPending": "Cancel their pending bookings and notify the other party",
+      "cancelPending": "Cancel their pending requests and accepted upcoming bookings, and notify the other party",
       "blockConfirm": "{count, plural, one {Block # user} other {Block # users}}",
       "unblockConfirm": "{count, plural, one {Unblock # user} other {Unblock # users}}",
       "deleteConfirm": "{count, plural, one {Delete # user} other {Delete # users}}",
@@ -1484,7 +1497,6 @@
       "impactServices": "{count, plural, one {# service hidden from search and the profile} other {# services hidden from search and the profile}}",
       "impactPacks": "{count, plural, one {# Ready Pack marked “Provider blocked”} other {# Ready Packs marked “Provider blocked”}}",
       "impactConversations": "{count, plural, one {# conversation becomes read-only} other {# conversations become read-only}}",
-      "impactUpcoming": "{count, plural, one {# accepted upcoming booking stays active} other {# accepted upcoming bookings stay active}}",
       "title": "Block {name}?",
       "descriptionProvider": "They can't sign in, their services disappear from the app and clients can't book them.",
       "descriptionClient": "They can't sign in, book or send messages until you unblock them.",
@@ -1498,13 +1510,20 @@
       "message": "Message to the user",
       "messagePlaceholder": "Optional. Sent by email and shown when they try to sign in.",
       "confirm": "Block account",
-      "bookingsTitle": "{pending} pending and {upcoming} upcoming bookings",
-      "cancelProvider": "Cancel them and notify the clients",
-      "cancelProviderHint": "Clients are told the provider is unavailable and can book someone else.",
-      "cancelClient": "Cancel them and notify the providers",
-      "cancelClientHint": "Providers are told the request was cancelled.",
-      "keep": "Keep them",
-      "keepHint": "Bookings stay; only new bookings are blocked."
+      "bookingsTitle": "{pending, plural, one {# pending request} other {# pending requests}} and {upcoming, plural, one {# accepted upcoming booking} other {# accepted upcoming bookings}}",
+      "cancelProvider": "Cancel them all and notify the clients",
+      "cancelProviderHint": "Pending requests and accepted bookings whose event is not over are cancelled (reason: account blocked), their invoices are voided and the clients are notified.",
+      "cancelClient": "Cancel them all and notify the providers",
+      "cancelClientHint": "Pending requests and accepted bookings whose event is not over are cancelled (reason: account blocked), their invoices are voided and the providers are notified.",
+      "keep": "Keep them all",
+      "impactPendingCancelled": "{count, plural, one {# pending request is cancelled} other {# pending requests are cancelled}}",
+      "impactUpcomingCancelled": "{count, plural, one {# accepted upcoming booking is cancelled and its invoice voided} other {# accepted upcoming bookings are cancelled and their invoices voided}}",
+      "impactPendingKept": "{count, plural, one {# pending request stays} other {# pending requests stay}}",
+      "impactUpcomingKeptProvider": "{count, plural, one {# accepted upcoming booking stays; the client is told the provider is unavailable} other {# accepted upcoming bookings stay; the clients are told the provider is unavailable}}",
+      "impactUpcomingKeptClient": "{count, plural, one {# accepted upcoming booking stays; the provider is told the client is unavailable} other {# accepted upcoming bookings stay; the providers are told the client is unavailable}}",
+      "keepProviderHint": "Pending requests and accepted bookings stay. The clients are told the provider is unavailable and can't propose a new date until the unblock.",
+      "keepClientHint": "Pending requests and accepted bookings stay. The providers are told the client is unavailable and can't propose a new date until the unblock.",
+      "unblockNoRestore": "Unblocking does not restore cancelled bookings."
     },
     "delete": {
       "linkedBookings": "{count, plural, one {# booking} other {# bookings}}",
@@ -1633,7 +1652,7 @@
       "actionsMenu": "Actions",
       "unblockTitle": "Unblock {name}?",
       "unblockDescriptionProvider": "They can sign in again and their published services and packs become visible. Cancelled bookings stay cancelled.",
-      "unblockDescriptionClient": "They can sign in, book and send messages again.",
+      "unblockDescriptionClient": "They can sign in, book and send messages again. Cancelled bookings stay cancelled.",
       "tabs": {
         "overview": "Overview",
         "documents": "Documents",
@@ -1684,8 +1703,8 @@
       "deleteNoteTitle": "Delete this note?",
       "noteDeleted": "Note deleted",
       "controls": "Account controls",
-      "controlsProvider": "Blocking hides all {services} published services and pauses {pending} pending bookings. Clients are told the provider is unavailable.",
-      "controlsClient": "Blocking signs them out and puts their {upcoming} upcoming bookings on hold. Providers are told.",
+      "controlsProvider": "Blocking signs them out and hides all {services} published services. You choose whether their {pending, plural, one {# pending request} other {# pending requests}} and {upcoming, plural, one {# accepted upcoming booking} other {# accepted upcoming bookings}} are cancelled or kept; unblocking does not restore cancelled bookings.",
+      "controlsClient": "Blocking signs them out. You choose whether their {pending, plural, one {# pending request} other {# pending requests}} and {upcoming, plural, one {# accepted upcoming booking} other {# accepted upcoming bookings}} are cancelled or kept; unblocking does not restore cancelled bookings.",
       "deleteShort": "Delete",
       "servicesTotal": "{count, plural, one {# service} other {# services}}",
       "packs": "Ready Packs",
@@ -1701,7 +1720,9 @@
         "none": "No reports about this account",
         "open": "{open} open · {onAccount} on the account",
         "total": "{count, plural, one {# report in total} other {# reports in total}}, on the account and on its content"
-      }
+      },
+      "deletedTitle": "This account was deleted · {date}",
+      "deletedDescription": "Read-only: its actions are hidden. Its past bookings, invoices and reviews stay, under “Deleted user”."
     },
     "photo": {
       "add": "Add photo",
@@ -2100,14 +2121,17 @@
       "status": {
         "free": "Free",
         "partial": "Partly busy",
-        "blocked": "Blocked by provider",
-        "held": "Pending booking",
-        "booked": "Booked"
-      },
-      "kind": {
         "blocked": "Blocked",
         "held": "Pending booking",
-        "booked": "Booked"
+        "booked": "Booked",
+        "blockedByEventor": "Blocked by Eventor",
+        "blockedByProvider": "Blocked by provider"
+      },
+      "kind": {
+        "held": "Pending booking",
+        "booked": "Booked",
+        "blockedByEventor": "Blocked by Eventor",
+        "blockedByProvider": "Blocked by provider"
       },
       "wholeDay": "Whole day",
       "allServices": "All services",
@@ -2123,7 +2147,8 @@
       "addBlock": "Block",
       "blocked": "Day blocked",
       "unblocked": "Block removed",
-      "noDailyLimit": "This provider has a service with no daily booking limit."
+      "noDailyLimit": "This provider has a service with no daily booking limit.",
+      "noteHint": "Internal: the provider never sees this note."
     },
     "detail": {
       "metaTitle": "Service",
@@ -2819,7 +2844,8 @@
       "parties": {
         "client": "Client",
         "provider": "Provider",
-        "admin": "Eventor (admin)"
+        "admin": "Eventor (admin)",
+        "system": "Eventor (automatic)"
       },
       "warnings": {
         "event_not_passed": "The event date hasn’t passed yet. Completing now opens reviews for the client early.",
@@ -3007,7 +3033,8 @@
       "by": {
         "client": "the client",
         "provider": "the provider",
-        "admin": "Eventor"
+        "admin": "Eventor",
+        "system": "Eventor (automatic)"
       },
       "conversation": "Conversation about this booking",
       "openChat": "Open full chat",

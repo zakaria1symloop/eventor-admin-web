@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { IconButton } from "@/components/ui/button";
-import { getAvailability, serviceKeys, type DayStatus } from "@/lib/api/services";
+import { dayStatusKey, getAvailability, serviceKeys, type DayStatus } from "@/lib/api/services";
 import { cn } from "@/lib/utils/cn";
 import { intlLocale } from "@/lib/utils/format";
 import { monthGrid, monthKey } from "../services/[id]/availability-calendar";
@@ -92,7 +92,7 @@ export function AvailabilityPicker({
               type="button"
               role="gridcell"
               aria-selected={selected}
-              aria-label={`${c.date} · ${ta(`status.${c.status}`)}${isCurrent ? ` · ${t("current")}` : ""}`}
+              aria-label={`${c.date} · ${ta(dayStatusKey(c))}${isCurrent ? ` · ${t("current")}` : ""}`}
               data-status={c.status}
               disabled={past}
               onClick={() => onChange(c.date, c.status)}

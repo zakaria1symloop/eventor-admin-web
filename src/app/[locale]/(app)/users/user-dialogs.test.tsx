@@ -52,7 +52,15 @@ describe("USR-07 BlockUserDialog", () => {
     ).toBeInTheDocument();
     expect(within(dialog).getByText("1 Ready Pack marked “Provider blocked”")).toBeInTheDocument();
     expect(within(dialog).getByText("17 conversations become read-only")).toBeInTheDocument();
-    expect(within(dialog).getByText("3 pending and 2 upcoming bookings")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("3 pending requests and 2 accepted upcoming bookings"),
+    ).toBeInTheDocument();
+    // Default "Cancel them all": the impact list says both counts are cancelled.
+    expect(within(dialog).getByText("3 pending requests are cancelled")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("2 accepted upcoming bookings are cancelled and their invoices voided"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Unblocking does not restore cancelled bookings.")).toBeInTheDocument();
     expect(getBlockImpact).toHaveBeenCalledWith("u1");
 
     // Reason is required.
@@ -61,7 +69,15 @@ describe("USR-07 BlockUserDialog", () => {
     expect(blockUser).not.toHaveBeenCalled();
 
     await user.selectOptions(within(dialog).getByRole("combobox", { name: /Reason/ }), "no_shows");
-    await user.click(within(dialog).getByRole("radio", { name: /Keep them/ }));
+    await user.click(within(dialog).getByRole("radio", { name: /Keep them all/ }));
+    // "Keep them all": both counts stay, and the impact list says so.
+    expect(within(dialog).getByText("3 pending requests stay")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(
+        "2 accepted upcoming bookings stay; the clients are told the provider is unavailable",
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByText("3 pending requests are cancelled")).not.toBeInTheDocument();
     await user.type(within(dialog).getByRole("textbox", { name: "Message to the user" }), "Contact support");
     await user.click(within(dialog).getByRole("button", { name: "Block account" }));
 
@@ -74,6 +90,33 @@ describe("USR-07 BlockUserDialog", () => {
       }),
     );
     expect(onBlocked).toHaveBeenCalledWith(result);
+  });
+
+  it("offers the choice when only accepted upcoming bookings exist, and sends cancel by default", async () => {
+    const user = userEvent.setup();
+    getBlockImpact.mockResolvedValue({
+      servicesCount: 0,
+      packsCount: 0,
+      pendingBookings: 0,
+      upcomingBookings: 1,
+      conversations: 0,
+    });
+    blockUser.mockResolvedValue({ cancelledBookings: 1 });
+    const client: UserTarget = { id: "c2", fullName: "Sofia Guerfi", role: "client" };
+    renderWithProviders(<BlockUserDialog user={client} open onOpenChange={() => undefined} />);
+
+    const dialog = await screen.findByRole("dialog", { name: "Block Sofia Guerfi?" });
+    expect(
+      await within(dialog).findByText("1 accepted upcoming booking is cancelled and its invoice voided"),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("radio", { name: /Cancel them all and notify the providers/ }),
+    ).toBeChecked();
+
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: /Reason/ }), "fraud");
+    await user.click(within(dialog).getByRole("button", { name: "Block account" }));
+    await waitFor(() => expect(blockUser).toHaveBeenCalled());
+    expect(blockUser.mock.calls[0][1]).toMatchObject({ bookings: "cancel" });
   });
 
   it("hides the bookings choice when nothing is pending and sends the duration", async () => {
