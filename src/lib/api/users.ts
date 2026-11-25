@@ -84,6 +84,8 @@ export interface UserStats {
   packs: { total: number; published: number } | null;
   reviews: { avg: number | null; count: number; reported: number };
   disputes: { open: number; total: number };
+  /** BUG-H3: reports about the account (on it, and on what it owns or wrote) — `GET /admin/reports?aboutUserId=`. */
+  reports: { open: number; openOnAccount: number; total: number };
   earnings: string;
   replyRate: number | null;
 }

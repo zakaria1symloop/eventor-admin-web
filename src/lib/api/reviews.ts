@@ -221,6 +221,7 @@ export const reviewKeys = {
 };
 export const reportKeys = {
   all: ["reports"] as const,
+  openCount: () => [...reportKeys.all, "open-count"] as const,
 };
 
 /** DataList URL params → `GET /admin/reviews` query (`provider`/`service`/`pack`/`author` come from other screens). */
@@ -260,6 +261,8 @@ export function reportsQuery(
   return {
     tab: p.tab || undefined,
     targetType: list("targetType"),
+    // URL-only (profile "Reports" counter): everything about one account.
+    aboutUserId: typeof f.aboutUser === "string" && f.aboutUser ? f.aboutUser : undefined,
     reason: list("reason"),
     createdFrom: created.from || undefined,
     createdTo: created.to || undefined,
@@ -296,6 +299,10 @@ export async function deleteReply(id: string): Promise<ReplyDeleted> {
 
 export function listReports(query: QueryParams): Promise<ReportList> {
   return api.get<ReportList>("/admin/reports", { query });
+}
+/** Open reports of every type (the Reports queue's Open tab count). */
+export async function openReportsCount(): Promise<number> {
+  return (await listReports({ tab: "open", limit: 1 })).meta.counts.open;
 }
 export async function resolveReport(id: string, body: ResolveReportBody): Promise<ReportRow> {
   return (await api.post<DataResponse<ReportRow>>(`/admin/reports/${id}/resolve`, body)).data;

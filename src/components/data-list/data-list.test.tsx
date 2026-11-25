@@ -114,3 +114,26 @@ describe("DataList URL sync", () => {
     expect(within(bar).getByRole("button", { name: "Block 2" })).toBeInTheDocument();
   });
 });
+
+describe("DataList URL-only filters", () => {
+  it("shows a urlOnly filter as a chip, never as a dropdown, and still applies it", async () => {
+    const queryFn = vi.fn((params: ListParams) => fetchMockUsers(params, { delay: 0 }));
+    renderWithProviders(
+      <DataList<MockUser>
+        resource={["users-url-only"]}
+        queryFn={queryFn}
+        columns={columns}
+        getRowId={(u) => u.id}
+        filters={[
+          { key: "wilaya", label: "Wilaya", options: [{ value: "Alger", label: "Alger" }] },
+          { key: "owner", label: "Owner", options: [], urlOnly: true, format: () => "Karim Belkacem" },
+        ]}
+      />,
+      { searchParams: "?owner=u1" },
+    );
+    await waitFor(() => expect(queryFn.mock.calls.at(-1)?.[0].filters).toEqual({ owner: "u1" }));
+    expect(screen.getByRole("button", { name: /^Wilaya$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Owner$/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Karim Belkacem/).length).toBeGreaterThan(0);
+  });
+});

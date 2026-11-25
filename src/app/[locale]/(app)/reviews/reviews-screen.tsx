@@ -40,6 +40,8 @@ import { getOverview, overviewKeys } from "@/lib/api/overview";
 import {
   listReviews,
   moderateReview,
+  openReportsCount,
+  reportKeys,
   REVIEW_TABS,
   reviewKeys,
   reviewsQuery,
@@ -100,6 +102,9 @@ export function ReviewsScreen() {
     staleTime: 60_000,
   });
   const counts = stats.data?.meta.counts;
+  // L-35: the queue badge counts open reports of every type (what the queue's Open tab lists),
+  // not reviews with open reports (that is the "Reported" card / tab).
+  const openReports = useQuery({ queryKey: reportKeys.openCount(), queryFn: openReportsCount });
   const v = (n: number | undefined) => (n === undefined ? "—" : formatNumber(n, locale));
   const avg = overview.data?.kpis.find((k) => k.key === "average_rating");
   const weekCount = week.data?.meta.counts.all;
@@ -329,9 +334,9 @@ export function ReviewsScreen() {
               label: (
                 <span className="inline-flex items-center gap-1.5">
                   {t("views.reports")}
-                  {counts?.reported ? (
+                  {openReports.data ? (
                     <span className="rounded-pill bg-red-soft px-1.5 text-11 text-red tabular-nums">
-                      {counts.reported}
+                      {formatNumber(openReports.data, locale)}
                     </span>
                   ) : null}
                 </span>

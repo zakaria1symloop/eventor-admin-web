@@ -13,6 +13,7 @@ import {
   Construction,
   Eye,
   FileText,
+  Flag,
   Layers,
   LogOut,
   MapPin,
@@ -798,6 +799,7 @@ function Overview({ user: u, onOverlay }: { user: UserDetail; onOverlay: (o: Ove
 
   const aside = (
     <>
+      <ReportsCard user={u} />
       <AccountDetailsCard user={u} />
       {provider && <DocumentsCard user={u} />}
       <NotesCard user={u} />
@@ -806,6 +808,47 @@ function Overview({ user: u, onOverlay }: { user: UserDetail; onOverlay: (o: Ove
   );
 
   return <TwoColumn main={main} aside={aside} />;
+}
+
+/**
+ * BUG-H3 — reports about this account: on the account itself (`user`, a provider included) and on what it
+ * owns or wrote (services, packs, messages, reviews, replies). Opens the Reports queue with `aboutUserId`.
+ */
+function ReportsCard({ user: u }: { user: UserDetail }) {
+  const tp = useTranslations("users.profile.reports");
+  const locale = useLocale();
+  const r = u.stats.reports;
+  if (!r) return null;
+  const href = `/reviews?view=reports&aboutUser=${u.id}${r.open > 0 ? "" : "&tab=all"}`;
+  return (
+    <Card>
+      <CardHeader
+        title={tp("title")}
+        action={r.total > 0 ? <SectionLink href={href}>{tp("view")}</SectionLink> : undefined}
+      />
+      <CardBody className="flex items-start gap-3">
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-full [&_svg]:size-4",
+            r.open > 0 ? "bg-red-soft text-red" : "bg-gray-soft text-muted",
+          )}
+        >
+          <Flag aria-hidden />
+        </span>
+        <div className="min-w-0 leading-tight">
+          <p className={cn("text-14 font-semibold", r.open > 0 ? "text-red" : "text-ink")}>
+            {r.total === 0
+              ? tp("none")
+              : tp("open", {
+                  open: formatNumber(r.open, locale),
+                  onAccount: formatNumber(r.openOnAccount, locale),
+                })}
+          </p>
+          {r.total > 0 && <p className="mt-1 text-12 text-muted">{tp("total", { count: r.total })}</p>}
+        </div>
+      </CardBody>
+    </Card>
+  );
 }
 
 function AccountDetailsCard({ user: u }: { user: UserDetail }) {

@@ -311,14 +311,17 @@ export function DataList<T extends object>({
               onChange={(q) => set({ q: q || null })}
             />
           }
-          filters={filters.slice(0, 4).map((f) => (
-            <FilterSelect
-              key={f.key}
-              filter={f}
-              value={params.filters[f.key]}
-              onChange={(v) => setFilter(f.key, v)}
-            />
-          ))}
+          filters={filters
+            .filter((f) => !f.urlOnly)
+            .slice(0, 4)
+            .map((f) => (
+              <FilterSelect
+                key={f.key}
+                filter={f}
+                value={params.filters[f.key]}
+                onChange={(v) => setFilter(f.key, v)}
+              />
+            ))}
           moreFilters={openDrawer}
           moreFiltersCount={Object.keys(advancedValues).length}
           end={endControls}

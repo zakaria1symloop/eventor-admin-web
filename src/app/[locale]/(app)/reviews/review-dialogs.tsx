@@ -13,6 +13,8 @@ import { SegmentedControl } from "@/components/forms/inputs";
 import { useRouter } from "@/i18n/navigation";
 import { DISPUTE_TYPES, disputeKeys, type DisputeType } from "@/lib/api/disputes";
 import { conversationKeys } from "@/lib/api/messaging";
+import { overviewKeys } from "@/lib/api/overview";
+import { userKeys } from "@/lib/api/users";
 import {
   convertReport,
   deleteReview,
@@ -43,6 +45,10 @@ function useInvalidateModeration() {
   return () => {
     void queryClient.invalidateQueries({ queryKey: reviewKeys.all });
     void queryClient.invalidateQueries({ queryKey: reportKeys.all });
+    // BUG-H3: profile "Reports" counters, sidebar badges and overview attention follow the queue.
+    void queryClient.invalidateQueries({ queryKey: userKeys.all });
+    void queryClient.invalidateQueries({ queryKey: overviewKeys.navCounts() });
+    void queryClient.invalidateQueries({ queryKey: overviewKeys.all });
   };
 }
 

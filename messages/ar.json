@@ -1694,7 +1694,14 @@
       "loading": "جارٍ التحميل…",
       "noPacks": "لا توجد باقات جاهزة بعد.",
       "packLine": "{count, plural, one {خدمة واحدة} other {# خدمات}} · {price}",
-      "needsAttention": "تحتاج إلى متابعة"
+      "needsAttention": "تحتاج إلى متابعة",
+      "reports": {
+        "title": "البلاغات",
+        "view": "عرض البلاغات",
+        "none": "لا توجد بلاغات بخصوص هذا الحساب",
+        "open": "{open} مفتوحة · {onAccount} على الحساب نفسه",
+        "total": "{count, plural, one {بلاغ واحد إجمالًا} two {بلاغان إجمالًا} few {# بلاغات إجمالًا} many {# بلاغًا إجمالًا} other {# بلاغ إجمالًا}}، على الحساب وعلى محتواه"
+      }
     },
     "photo": {
       "add": "إضافة صورة",
@@ -4278,9 +4285,11 @@
     },
     "reportsQueue": {
       "filters": {
-        "target": "المحتوى",
+        "target": "النوع",
         "reason": "السبب",
-        "created": "تاريخ البلاغ"
+        "created": "تاريخ البلاغ",
+        "aboutUser": "بخصوص",
+        "aboutUserFallback": "هذا الحساب"
       },
       "targets": {
         "review": "تقييم",
@@ -4288,7 +4297,7 @@
         "message": "رسالة",
         "service": "خدمة",
         "pack": "باقة",
-        "user": "مستخدم"
+        "user": "حساب"
       },
       "columns": {
         "target": "المحتوى المُبلّغ عنه",
@@ -4300,7 +4309,7 @@
       "automatic": "تلقائي",
       "dispute": "نزاع",
       "menu": {
-        "openTarget": "فتح المحتوى",
+        "openTarget": "الانتقال إلى العنصر",
         "resolve": "معالجة",
         "dismiss": "رفض",
         "convert": "تحويل إلى نزاع"

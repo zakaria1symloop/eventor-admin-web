@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, ExternalLink, Flag, Scale, ShieldCheck, XCircle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
@@ -27,6 +28,7 @@ import {
   type ReportRow,
 } from "@/lib/api/reviews";
 import { savedViewsSource } from "@/lib/api/saved-views";
+import { getUser, userKeys } from "@/lib/api/users";
 import { formatDate, formatNumber } from "@/lib/utils/format";
 import { ConvertReportDialog, ReportDecisionDialog } from "./review-dialogs";
 
@@ -50,6 +52,14 @@ export function ReportsList({
   const [converting, setConverting] = useState<string | null>(null);
   const [params, setParams] = useState<ListParams | null>(null);
   const [total, setTotal] = useState(0);
+  // "Everything about this account" (profile Reports counter): name the person in the filter chip.
+  const aboutUserId = typeof params?.filters.aboutUser === "string" ? params.filters.aboutUser : "";
+  const aboutUser = useQuery({
+    queryKey: userKeys.detail(aboutUserId),
+    queryFn: () => getUser(aboutUserId),
+    enabled: !!aboutUserId,
+    retry: false,
+  });
 
   const filters: FilterConfig[] = [
     {
@@ -63,6 +73,14 @@ export function ReportsList({
       label: t("filters.reason"),
       multiple: true,
       options: REPORT_REASONS.map((k) => ({ value: k, label: tr(`reasons.${k}`) })),
+    },
+    // URL-only: `?aboutUser={id}` from a user / provider profile.
+    {
+      key: "aboutUser",
+      label: t("filters.aboutUser"),
+      options: [],
+      urlOnly: true,
+      format: () => aboutUser.data?.fullName ?? t("filters.aboutUserFallback"),
     },
   ];
   const advancedFilters: AdvancedFilterField[] = [
@@ -167,12 +185,14 @@ export function ReportsList({
   const rowMenu = (r: ReportRow): ActionMenuItem[][] => {
     const open = r.status === "open";
     const href = dashboardHref(r.target.href);
+    // "Go to target" only when there is one (`target.href` is null once the target was deleted).
+    const goTo: ActionMenuItem[] = r.target.reviewId
+      ? [{ icon: <ExternalLink />, label: t("menu.openTarget"), onSelect: () => openTarget(r) }]
+      : href
+        ? [{ icon: <ExternalLink />, label: t("menu.openTarget"), href }]
+        : [];
     return [
-      [
-        r.target.reviewId
-          ? { icon: <ExternalLink />, label: t("menu.openTarget"), onSelect: () => openTarget(r) }
-          : { icon: <ExternalLink />, label: t("menu.openTarget"), href: href ?? undefined, disabled: !href },
-      ],
+      ...(goTo.length ? [goTo] : []),
       [
         {
           icon: <CheckCircle2 />,

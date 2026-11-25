@@ -12,6 +12,8 @@ export interface FilterConfig {
   multiple?: boolean;
   /** Chip text for values without options (ranges, toggles). */
   format?: (value: string | string[]) => string;
+  /** Set from a link only (e.g. a profile): shown as a removable chip, never as a filter dropdown. */
+  urlOnly?: boolean;
 }
 
 export interface ListParams {
