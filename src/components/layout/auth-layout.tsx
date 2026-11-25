@@ -4,8 +4,19 @@ import { ChevronLeft } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { LanguageSwitch } from "./language-switch";
 
-/** SHL-03 / SHL-04 two-panel layout: brand panel + form column. */
-export function AuthLayout({ children }: { children: ReactNode }) {
+/**
+ * SHL-03 / SHL-04 two-panel layout: brand panel + form column.
+ * `panel` / `tagline` replace the admin texts on public pages for app users (e.g. `/set-password`).
+ */
+export function AuthLayout({
+  children,
+  panel,
+  tagline,
+}: {
+  children: ReactNode;
+  panel?: ReactNode;
+  tagline?: ReactNode;
+}) {
   const t = useTranslations("auth");
   const ta = useTranslations("app");
   return (
@@ -13,8 +24,8 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       <aside className="relative hidden flex-col justify-between bg-brand px-11 py-10 text-white lg:flex">
         <span className="text-22 font-semibold">{ta("name")}</span>
         <div>
-          <p className="text-[40px] leading-[48px] font-semibold">{ta("panel")}</p>
-          <p className="mt-3 max-w-md text-16 text-white/80">{t("tagline")}</p>
+          <p className="text-[40px] leading-[48px] font-semibold">{panel ?? ta("panel")}</p>
+          <p className="mt-3 max-w-md text-16 text-white/80">{tagline ?? t("tagline")}</p>
         </div>
         <span className="text-12 text-white/70">{t("copyright", { year: 2026 })}</span>
       </aside>

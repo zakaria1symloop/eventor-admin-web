@@ -456,7 +456,8 @@
     "required": "Required",
     "email": "Enter a valid email address",
     "passwordWeak": "Use at least 10 characters with a letter and a number",
-    "passwordMismatch": "The passwords don't match"
+    "passwordMismatch": "The passwords don't match",
+    "passwordTooLong": "Use {max} characters at most"
   },
   "auth": {
     "tagline": "Verify providers, follow bookings and keep the marketplace safe.",
@@ -470,6 +471,36 @@
     "submit": "Send reset link",
     "sent": "If this email belongs to an admin, a link is on its way. Check spam too.",
     "network": "Can't reach the Eventor API. Try again in a moment."
+  },
+  "setPassword": {
+    "title": "Choose your password",
+    "panel": "Your Eventor account",
+    "tagline": "Plan your events with trusted providers, right from your phone.",
+    "checking": "Checking your link…",
+    "hello": "Hello {firstName}, choose a password for {emailHint}.",
+    "password": "Password",
+    "confirm": "Confirm password",
+    "rulesTitle": "Your password needs",
+    "ruleLength": "{min} to {max} characters",
+    "ruleLetter": "At least one letter",
+    "ruleDigit": "At least one digit",
+    "ruleMet": "(done)",
+    "ruleNotMet": "(not yet)",
+    "submit": "Set my password",
+    "invalidTitle": "This link is not valid or was already used",
+    "invalidDescription": "Each link works only once. If you already chose your password, sign in in the Eventor app.",
+    "expiredTitle": "This link has expired, ask Eventor for a new one",
+    "expiredDescription": "Links to choose a password work for 7 days.",
+    "blockedTitle": "This account is blocked",
+    "blockedReason": "Reason: {reason}",
+    "blockedDescription": "Eventor has suspended this account, so it cannot be used for now.",
+    "doneTitle": "Your password is set",
+    "doneDescription": "Open the Eventor app and sign in with {email}.",
+    "getAndroid": "Get it on Google Play",
+    "getIos": "Download on the App Store",
+    "rateLimited": "Too many attempts. Wait a minute, then try again.",
+    "network": "Can't reach Eventor right now. Check your connection and try again.",
+    "retry": "Try again"
   },
   "reset": {
     "title": "Set a new password",
