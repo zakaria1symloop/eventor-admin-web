@@ -509,9 +509,14 @@
     "confirm": "Confirm password",
     "rule": "10+ characters, one letter and one number",
     "submit": "Change password",
-    "invalidTitle": "This reset link is invalid or has expired",
-    "invalidDescription": "Links work once and expire after 1 hour.",
-    "requestNew": "Request a new link",
+    "invalidTitle": "This link is not valid or was already used",
+    "invalidDescription": "Each reset link works only once. Request a new one in the Eventor app (Forgot password), or below if you are an administrator.",
+    "expiredTitle": "This link has expired",
+    "expiredDescription": "Reset links work for 1 hour. Request a new one in the Eventor app (Forgot password), or below if you are an administrator.",
+    "requestNew": "New link for administrators",
+    "doneTitle": "Your password has been changed",
+    "doneDescription": "Sign in again on the dashboard or in the Eventor app.",
+    "toDashboardSignIn": "Go to the dashboard sign-in",
     "network": "Can't reach the Eventor API. Try again in a moment."
   },
   "invitation": {

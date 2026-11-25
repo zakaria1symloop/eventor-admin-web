@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { useHydrated } from "@/lib/utils/use-hydrated";
-import { Link, useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/forms/fields";
 import { PasswordInput } from "@/components/forms/inputs";
@@ -15,44 +15,61 @@ import { ApiError } from "@/lib/api/errors";
 import { applyApiFieldErrors, isNetworkError } from "@/lib/auth/form-errors";
 import { newPasswordSchema } from "@/lib/auth/password-schema";
 
-/** SHL-04 email link: POST /admin/auth/reset → /login?reset=1 ("Password changed" toast). */
+/** Why the link can't be used: 400 RESET_TOKEN_INVALID (unknown, used or altered) or 410 RESET_TOKEN_EXPIRED. */
+type LinkProblem = "invalid" | "expired";
+
+/**
+ * SHL-04 e-mailed reset link: POST /admin/auth/reset. The API redeems links of admin **and** app
+ * accounts (BUG-L3), so the success screen stays neutral instead of sending everyone to the dashboard login.
+ */
 export function ResetPasswordForm({ token }: { token: string }) {
   const t = useTranslations("reset");
   const hydrated = useHydrated();
   const tv = useTranslations("validation");
-  const router = useRouter();
   const form = useForm<{ password: string; confirm: string }>({
     resolver: zodResolver(newPasswordSchema(tv)),
     defaultValues: { password: "", confirm: "" },
   });
-  const [error, setError] = useState<"invalid" | string | null>(token ? null : "invalid");
+  const [problem, setProblem] = useState<LinkProblem | null>(token ? null : "invalid");
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const onSubmit = form.handleSubmit(async ({ password }) => {
     setError(null);
     try {
       await resetPassword(token, password);
-      router.replace("/login?reset=1");
+      setDone(true);
     } catch (e) {
       if (applyApiFieldErrors(e, form.setError, ["password"])) return;
       if (e instanceof ApiError && e.code === "PASSWORD_WEAK") {
         form.setError("password", { type: "server", message: e.message || tv("passwordWeak") });
-      } else if (
-        e instanceof ApiError &&
-        (e.code === "RESET_TOKEN_INVALID" || e.code === "RESET_TOKEN_EXPIRED")
-      ) {
-        setError("invalid");
+      } else if (e instanceof ApiError && e.code === "RESET_TOKEN_EXPIRED") {
+        setProblem("expired");
+      } else if (e instanceof ApiError && e.code === "RESET_TOKEN_INVALID") {
+        setProblem("invalid");
       } else {
         setError(isNetworkError(e) ? t("network") : e instanceof Error ? e.message : String(e));
       }
     }
   });
 
-  if (error === "invalid") {
+  if (done) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Banner tone="green" title={t("doneTitle")} description={t("doneDescription")} />
+        <Link href="/login" className="text-13 font-medium text-brand hover:underline">
+          {t("toDashboardSignIn")}
+        </Link>
+      </div>
+    );
+  }
+
+  if (problem) {
     return (
       <Banner
-        tone="red"
-        title={t("invalidTitle")}
-        description={t("invalidDescription")}
+        tone={problem === "expired" ? "amber" : "red"}
+        title={t(problem === "expired" ? "expiredTitle" : "invalidTitle")}
+        description={t(problem === "expired" ? "expiredDescription" : "invalidDescription")}
         action={
           <Link href="/forgot-password" className="text-13 font-medium text-brand hover:underline">
             {t("requestNew")}
