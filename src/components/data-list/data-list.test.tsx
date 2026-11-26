@@ -169,3 +169,85 @@ describe("L-37 DataList result for summaries", () => {
     );
   });
 });
+
+describe("L-39 saving a view refreshes the Views menu", () => {
+  type SourceView = {
+    id: string;
+    name: string;
+    query: Record<string, string>;
+    isShared: boolean;
+    isMine: boolean;
+  };
+
+  function setupViews(onSaveImpl?: () => Promise<unknown>) {
+    const store: SourceView[] = [];
+    const queryFn = vi.fn(async () => [...store]);
+    const onSave = vi.fn(
+      onSaveImpl ??
+        (async (input: { name: string; isShared: boolean; query: Record<string, string | string[]> }) => {
+          store.push({
+            id: `v${store.length + 1}`,
+            name: input.name,
+            query: {},
+            isShared: input.isShared,
+            isMine: true,
+          });
+        }),
+    );
+    renderWithProviders(
+      <DataList<MockUser>
+        resource={["users-test-views"]}
+        queryFn={(params: ListParams) => fetchMockUsers(params, { delay: 0 })}
+        columns={columns}
+        getRowId={(u) => u.id}
+        savedViews={{ queryKey: ["saved-views", "users-test"], queryFn, onSave }}
+      />,
+    );
+    return { queryFn, onSave };
+  }
+
+  async function openViews(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: "Views" }));
+    return screen.findByRole("menu");
+  }
+
+  it("lists the new view right after saving, without a reload", async () => {
+    const user = userEvent.setup();
+    const { queryFn, onSave } = setupViews();
+
+    // The menu is opened once first, so the empty list is cached (as in the browser).
+    let menu = await openViews(user);
+    expect(await within(menu).findAllByText("No views yet")).toHaveLength(2);
+    await user.click(within(menu).getByRole("menuitem", { name: "Save current view…" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Save view" });
+    await user.type(within(dialog).getByRole("textbox", { name: /View name/ }), "Alger clients");
+    await user.click(within(dialog).getByRole("button", { name: "Save view" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Save view" })).not.toBeInTheDocument());
+
+    menu = await openViews(user);
+    expect(await within(menu).findByText("Alger clients")).toBeInTheDocument();
+    expect(queryFn.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("keeps the list and shows the error when the save fails", async () => {
+    const user = userEvent.setup();
+    const { queryFn } = setupViews(async () => {
+      throw new Error("You already have a view with this name in this list.");
+    });
+
+    const menu = await openViews(user);
+    await within(menu).findAllByText("No views yet");
+    await user.click(within(menu).getByRole("menuitem", { name: "Save current view…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Save view" });
+    await user.type(within(dialog).getByRole("textbox", { name: /View name/ }), "Duplicate");
+    await user.click(within(dialog).getByRole("button", { name: "Save view" }));
+
+    expect(
+      await within(dialog).findByText("You already have a view with this name in this list."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Save view" })).toBeInTheDocument();
+    expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+});

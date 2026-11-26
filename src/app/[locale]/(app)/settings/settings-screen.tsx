@@ -72,6 +72,8 @@ export function SettingsScreen() {
                 {card("notifications")}
               </div>
               {card("support")}
+              {/* The nav lists "legal" (Terms of Use, Privacy Policy EN/AR); its card was never placed (since ba3df7a). */}
+              {card("legal")}
               {card("maintenance")}
             </>
           )}

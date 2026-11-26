@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { RowSelectionState, SortingState } from "@tanstack/react-table";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -133,6 +133,7 @@ export function DataList<T extends object>({
   hidePagination,
 }: DataListProps<T>) {
   const ts = useTranslations("states");
+  const queryClient = useQueryClient();
   const tf = useTranslations("filters");
 
   const advancedConfigs = useMemo(
@@ -457,6 +458,9 @@ export function DataList<T extends object>({
           onOpenChange={setSaveOpen}
           onSave={async ({ name, isShared }) => {
             await savedViews.onSave({ name, isShared, query: currentQuery(saveDraft) });
+            // L-39: the Views menu caches its list; refresh it (and any other menu of this resource) so the
+            // new view shows at once. Delete and rename refresh it from inside the menu. Not reached on error.
+            void queryClient.invalidateQueries({ queryKey: savedViews.queryKey });
             if (saveDraft) {
               applyAdvanced(saveDraft);
               setDrawerOpen(false);
